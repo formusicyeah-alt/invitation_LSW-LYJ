@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>이승원 & 이유진의 모청메이플</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; background-color: #000; overflow: hidden; width: 100vw; height: 100vh; }
+        #game-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+    </style>
+</head>
+<body>
+
+<div id="game-container"></div>
+
+<script>
+    const config = {
+        type: Phaser.AUTO,
+        width: 1280,
+        height: 720,
+        parent: 'game-container',
+        render: { pixelArt: true },
+        scale: {
+            mode: Phaser.Scale.FIT,
+            autoCenter: Phaser.Scale.CENTER_BOTH
+        },
+        scene: { preload: preload, create: create }
+    };
+
+    const game = new Phaser.Game(config);
+    let selectedChar = ""; 
+
+    function preload() {
+        this.load.image('bg_select', 'images/bg_select.png'); 
+        this.load.image('sound_on', 'images/sound_on.png');
+        this.load.image('sound_off', 'images/sound_off.png');
+        
+        this.load.audio('bgm_select', 'audio/bgm_select.mp3');
+
+        for(let z=0; z<=3; z++) this.load.image(`man_stand1_${z}`, `images/man_stand1_${z}.png`);
+        for(let z=0; z<=4; z++) this.load.image(`man_walk1_${z}`, `images/man_walk1_${z}.png`);
+        for(let z=0; z<=1; z++) this.load.image(`man_jump_${z}`, `images/man_jump_${z}.png`);
+
+        for(let z=0; z<=3; z++) this.load.image(`woman_stand1_${z}`, `images/woman_stand1_${z}.png`);
+        for(let z=0; z<=4; z++) this.load.image(`woman_walk1_${z}`, `images/woman_walk1_${z}.png`);
+        for(let z=0; z<=1; z++) this.load.image(`woman_jump_${z}`, `images/woman_jump_${z}.png`);
+
+        for(let z=0; z<=3; z++) this.load.image(`toben_stand1_${z}`, `images/toben_stand1_${z}.png`);
+        for(let z=0; z<=4; z++) this.load.image(`toben_walk1_${z}`, `images/toben_walk1_${z}.png`);
+        for(let z=0; z<=1; z++) this.load.image(`toben_jump_${z}`, `images/toben_jump_${z}.png`);
+    }
+
+    function create() {
+        this.add.image(640, 360, 'bg_select').setDisplaySize(1280, 720);
+        this.add.text(640, 100, "하객룩을 선택해주세요!", {
+            fontFamily: "Arial", fontSize: "40px", fill: "#ffffff", stroke: "#000000", strokeThickness: 4
+        }).setOrigin(0.5);
+
+        // ==========================================
+        // 🛠️ 1. 애니메이션 생성
+        // ==========================================
+        this.anims.create({ key: 'man_breathing', frames: [ { key: 'man_stand1_0' }, { key: 'man_stand1_1' }, { key: 'man_stand1_2' }, { key: 'man_stand1_3' }, { key: 'man_stand1_2' }, { key: 'man_stand1_1' } ], frameRate: 4, repeat: -1 });
+        this.anims.create({ key: 'man_walking', frames: [ { key: 'man_walk1_0' }, { key: 'man_walk1_1' }, { key: 'man_walk1_2' }, { key: 'man_walk1_3' }, { key: 'man_walk1_4' } ], frameRate: 6, repeat: -1 });
+        
+        this.anims.create({ key: 'woman_breathing', frames: [ { key: 'woman_stand1_0' }, { key: 'woman_stand1_1' }, { key: 'woman_stand1_2' }, { key: 'woman_stand1_3' }, { key: 'woman_stand1_2' }, { key: 'woman_stand1_1' } ], frameRate: 4, repeat: -1 });
+        this.anims.create({ key: 'woman_walking', frames: [ { key: 'woman_walk1_0' }, { key: 'woman_walk1_1' }, { key: 'woman_walk1_2' }, { key: 'woman_walk1_3' }, { key: 'woman_walk1_4' } ], frameRate: 6, repeat: -1 });
+        
+        this.anims.create({ key: 'toben_breathing', frames: [ { key: 'toben_stand1_0' }, { key: 'toben_stand1_1' }, { key: 'toben_stand1_2' }, { key: 'toben_stand1_3' }, { key: 'toben_stand1_2' }, { key: 'toben_stand1_1' } ], frameRate: 4, repeat: -1 });
+        this.anims.create({ key: 'toben_walking', frames: [ { key: 'toben_walk1_0' }, { key: 'toben_walk1_1' }, { key: 'toben_walk1_2' }, { key: 'toben_walk1_3' }, { key: 'toben_walk1_4' } ], frameRate: 6, repeat: -1 });
+
+        // ==========================================
+        // 🎮 2. 캐릭터 배치 및 선택 로직 (요청한 좌표 적용 완료)
+        // ==========================================
+        let manBtn = this.add.sprite(500, 455, 'man_stand1_0').setInteractive({ useHandCursor: true }).setScale(2);
+        manBtn.play('man_breathing');
+
+        let womanBtn = this.add.sprite(775, 455, 'woman_stand1_0').setInteractive({ useHandCursor: true }).setScale(2);
+        womanBtn.play('woman_breathing');
+
+        let tobenBtn = this.add.sprite(1050, 465, 'toben_stand1_0').setInteractive({ useHandCursor: true }).setScale(2);
+        tobenBtn.play('toben_breathing');
+
+        const selectCharacter = (targetBtn, targetWalkAnim, charName) => {
+            if (selectedChar === charName) {
+                alert(`${charName} 하객 선택 완료! 웨딩 빌리지로 이동합니다.`);
+                return;
+            }
+
+            manBtn.play('man_breathing');
+            womanBtn.play('woman_breathing');
+            tobenBtn.play('toben_breathing');
+
+            targetBtn.play(targetWalkAnim);
+            selectedChar = charName; 
+        };
+
+        manBtn.on('pointerdown', () => selectCharacter(manBtn, 'man_walking', 'man'));
+        womanBtn.on('pointerdown', () => selectCharacter(womanBtn, 'woman_walking', 'woman'));
+        tobenBtn.on('pointerdown', () => selectCharacter(tobenBtn, 'toben_walking', 'toben'));
+
+        // ==========================================
+        // 🎵 3. BGM 및 토글 버튼 (디폴트: Off 상태)
+        // ==========================================
+        // 디폴트 이미지를 'sound_off'로 설정
+        let soundBtn = this.add.image(1200, 50, 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1);
+        let bgm = null;
+
+        if (this.cache.audio.exists('bgm_select')) {
+            bgm = this.sound.add('bgm_select', { loop: true, volume: 0.5 });
+            // 자동 재생 시도 및 강제 이벤트 연결을 모두 삭제하여 디폴트 무음(Off) 상태 유지
+        }
+
+        soundBtn.on('pointerdown', (pointer, localX, localY, event) => {
+            event.stopPropagation();
+            
+            if (!bgm) return; 
+
+            if (bgm.isPlaying) {
+                bgm.pause(); // 음악 일시정지
+                soundBtn.setTexture('sound_off'); // off 이미지로 변경
+            } else {
+                // 처음 재생하거나 일시정지 상태에서 다시 켤 때
+                if (bgm.isPaused) {
+                    bgm.resume();
+                } else {
+                    bgm.play();
+                }
+                soundBtn.setTexture('sound_on'); // on 이미지로 변경
+            }
+        });
+    }
+</script>
+
+</body>
+</html>
