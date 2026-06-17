@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>이승원 & 이유진의 모청메이플</title>
+    <title>이승원,이유진 결혼합니다.</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background-color: #000; }
@@ -22,16 +22,19 @@
         preload() {
             for (let i = 0; i <= 20; i++) this.load.image(`invit_${i}`, `images/invit_${i}.png`);
             this.load.image('bg_select', 'images/bg_select.png'); 
+            this.load.image('sign', 'images/sign.png'); // [수정] 입장 버튼 이미지 로드
             const chars = ['man', 'woman', 'toben'];
             chars.forEach(char => {
                 for(let z=0; z<=3; z++) this.load.image(`${char}_stand1_${z}`, `images/${char}_stand1_${z}.png`);
                 for(let z=0; z<=4; z++) this.load.image(`${char}_walk1_${z}`, `images/${char}_walk1_${z}.png`);
                 for(let z=0; z<=1; z++) this.load.image(`${char}_jump_${z}`, `images/${char}_jump_${z}.png`);
             });
+            for (let i = 0; i <= 7; i++) this.load.image(`portal_${i}`, `images/portal_${i}.png`);
+            for (let i = 0; i <= 5; i++) this.load.image(`sprite_${i}`, `images/sprite_${i}.png`);
         }
         create() {
             this.anims.create({ key: 'invit_playing', frames: Array.from({length:21}, (_,i)=>({key:`invit_${i}`})), frameRate: 12, repeat: -1 });
-            this.add.sprite(640, 360, 'invit_0').play('invit_playing').setInteractive().on('pointerup', () => {
+            this.add.sprite(640, 360, 'invit_0').setScale(2).play('invit_playing').setInteractive().on('pointerup', () => {
                 try { if (!this.scale.isFullscreen) this.scale.startFullscreen(); } catch (e) {}
                 this.scene.start('SelectScene');
             });
@@ -43,23 +46,36 @@
         create() {
             this.selectedChar = ""; 
             this.add.image(640, 360, 'bg_select').setDisplaySize(1280, 720);
+            
+            this.anims.create({ key: 'portal_playing', frames: Array.from({length: 8}, (_, i) => ({ key: `portal_${i}` })), frameRate: 5, repeat: -1 });
+            this.add.sprite(300, 500, 'portal_0').setOrigin(0.2, 1).setScale(1.5).play('portal_playing');
+
+            this.anims.create({ key: 'spotlight_playing', frames: Array.from({length: 6}, (_, i) => ({ key: `sprite_${i}` })), frameRate: 10, repeat: -1 });
+            this.spotlight = this.add.sprite(-200, -200, 'sprite_0').setScale(2).play('spotlight_playing').setVisible(false);
+
             const chars = ['man', 'woman', 'toben'];
             chars.forEach(char => {
                 this.anims.create({ key: `${char}_breathing`, frames: [ { key: `${char}_stand1_0` }, { key: `${char}_stand1_0` }, { key: `${char}_stand1_1` }, { key: `${char}_stand1_1` }, { key: `${char}_stand1_2` }, { key: `${char}_stand1_2` }, { key: `${char}_stand1_3` }, { key: `${char}_stand1_3` } ], frameRate: 6, repeat: -1 });
                 this.anims.create({ key: `${char}_walking`, frames: [ { key: `${char}_walk1_0` }, { key: `${char}_walk1_1` }, { key: `${char}_walk1_2` }, { key: `${char}_walk1_3` }, { key: `${char}_walk1_4` } ], frameRate: 6, repeat: -1 });
             });
-            let manBtn = this.add.sprite(500, 455, 'man_stand1_0').setInteractive().setScale(2).play('man_breathing');
-            let womanBtn = this.add.sprite(775, 455, 'woman_stand1_0').setInteractive().setScale(2).play('woman_breathing');
-            let tobenBtn = this.add.sprite(1050, 465, 'toben_stand1_0').setInteractive().setScale(2).play('toben_breathing');
+            let manBtn = this.add.sprite(500, 550, 'man_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('man_breathing');
+            let womanBtn = this.add.sprite(725, 550, 'woman_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('woman_breathing');
+            let tobenBtn = this.add.sprite(950, 550, 'toben_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('toben_breathing');
+            
             const selectCharacter = (targetBtn, charName) => {
                 [manBtn, womanBtn, tobenBtn].forEach(b => { b.setAlpha(0.5); b.play(b.texture.key.split('_')[0] + '_breathing'); });
                 targetBtn.setAlpha(1).play(`${charName}_walking`);
                 this.selectedChar = charName; 
+                this.spotlight.setVisible(true).setPosition(targetBtn.x, targetBtn.y - 250);
             };
             manBtn.on('pointerdown', () => selectCharacter(manBtn, 'man'));
             womanBtn.on('pointerdown', () => selectCharacter(womanBtn, 'woman'));
             tobenBtn.on('pointerdown', () => selectCharacter(tobenBtn, 'toben'));
-            this.add.image(1100, 250, 'invit_20').setInteractive().on('pointerdown', () => { if(this.selectedChar) this.scene.start('VillageScene', { character: this.selectedChar }); });
+            
+            // [수정] sign.png 버튼 배치 (좌표 1150, 500 및 크기 1/5)
+            this.add.image(1150, 305, 'sign').setScale(0.3).setInteractive().on('pointerdown', () => { 
+                if(this.selectedChar) this.scene.start('VillageScene', { character: this.selectedChar }); 
+            });
         }
     }
 
@@ -68,19 +84,17 @@
         init(data) { this.myChar = data.character; }
         create() {
             this.cameras.main.setBackgroundColor('#ffffff');
-            this.player = this.physics.add.sprite(640, 360, `${this.myChar}_stand1_0`).setScale(1.5).setCollideWorldBounds(true).setBounce(0);
+            this.player = this.physics.add.sprite(640, 360, `${this.myChar}_stand1_0`).setScale(1.5).setOrigin(0.5, 1).setCollideWorldBounds(true).setBounce(0);
             
-            // 점프 애니메이션: jump_0(상승/하강), jump_1(최고점)
             this.anims.create({ key: `${this.myChar}_jump_up`, frames: [{ key: `${this.myChar}_jump_0` }], frameRate: 1 });
             this.anims.create({ key: `${this.myChar}_jump_peak`, frames: [{ key: `${this.myChar}_jump_1` }], frameRate: 1 });
             
-            let ground = this.add.rectangle(640, 710, 1280, 20, 0x00ff00, 1); // 색상을 초록색(0x00ff00)으로, 투명도를 1로 변경
+            let ground = this.add.rectangle(640, 710, 1280, 20, 0x00ff00, 1); 
             this.physics.add.existing(ground, true); 
-            this.physics.add.collider(this.player, ground);
-            
+            this.physics.add.collider(this.player, ground); 
             
             this.controls = { left: false, right: false };
-            this.isJumping = false; // 공중 상태 플래그
+            this.isJumping = false;
 
             const btnStyle = { font: '30px Arial', fill: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', padding: {x: 20, y: 20} };
             this.add.text(80, 550, '◀', btnStyle).setInteractive().on('pointerdown', () => this.controls.left = true).on('pointerup', () => this.controls.left = false);
@@ -93,28 +107,17 @@
             });
         }
         update() {
-            // 바닥에 닿으면 점프 상태 해제
             if (this.player.body.blocked.down) this.isJumping = false;
+            if (this.controls.left) { this.player.setVelocityX(-300).setFlipX(false); } 
+            else if (this.controls.right) { this.player.setVelocityX(300).setFlipX(true); } 
+            else { this.player.setVelocityX(0); }
 
             if (this.isJumping) {
-                // 최고점 판단: y축 속도 절대값이 50 미만일 때 jump_1 고정
-                if (Math.abs(this.player.body.velocity.y) < 50) {
-                    this.player.anims.play(`${this.myChar}_jump_peak`, true);
-                } else {
-                    this.player.anims.play(`${this.myChar}_jump_up`, true);
-                }
+                if (Math.abs(this.player.body.velocity.y) < 50) { this.player.anims.play(`${this.myChar}_jump_peak`, true); } 
+                else { this.player.anims.play(`${this.myChar}_jump_up`, true); }
             } else {
-                // 지상 로직
-                if (this.controls.left) { 
-                    this.player.setVelocityX(-300).setFlipX(false); 
-                    this.player.anims.play(`${this.myChar}_walking`, true); 
-                } else if (this.controls.right) { 
-                    this.player.setVelocityX(300).setFlipX(true); 
-                    this.player.anims.play(`${this.myChar}_walking`, true); 
-                } else { 
-                    this.player.setVelocityX(0); 
-                    this.player.anims.play(`${this.myChar}_breathing`, true); 
-                }
+                if (this.controls.left || this.controls.right) { this.player.anims.play(`${this.myChar}_walking`, true); } 
+                else { this.player.anims.play(`${this.myChar}_breathing`, true); }
             }
         }
     }
