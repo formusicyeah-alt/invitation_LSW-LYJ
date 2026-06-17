@@ -26,7 +26,6 @@
             this.load.image('title_sign', 'images/title_sign.png'); 
             this.load.image('title', 'images/title.png'); 
             
-            // 💡 무거운 사운드 에셋을 첫 화면에서 미리 로드하여 전환 렉을 방지합니다.
             this.load.image('sound_on', 'images/sound_on.png');
             this.load.image('sound_off', 'images/sound_off.png');
             this.load.audio('bgm_select', 'audio/bgm_select.mp3');
@@ -44,22 +43,26 @@
             this.anims.create({ key: 'invit_playing', frames: Array.from({length:21}, (_,i)=>({key:`invit_${i}`})), frameRate: 12, repeat: -1 });
             this.add.sprite(640, 360, 'invit_0').setScale(2).play('invit_playing').setInteractive().on('pointerup', () => {
                 try { if (!this.scale.isFullscreen) this.scale.startFullscreen(); } catch (e) {}
-                this.scene.start('SelectScene');
+                
+                // 💡 클릭 시 바로 전환되지 않고, 1.5초간 어두워진(Fade Out) 후 전환됩니다.
+                this.cameras.main.fadeOut(1500, 0, 0, 0);
+                this.cameras.main.once('camerafadeoutcomplete', () => {
+                    this.scene.start('SelectScene');
+                });
             });
         }
     }
 
     class SelectScene extends Phaser.Scene {
         constructor() { super({ key: 'SelectScene' }); }
-        
-        preload() {
-            // 첫 씬에서 로드하므로 여기는 비워둡니다. (렉 제거 핵심)
-        }
+        preload() {}
 
         create() {
+            // 💡 이전 씬에서 어두워진 상태로 오기 때문에, 0.5초간 다시 밝아지는(Fade In) 효과를 줍니다.
+            this.cameras.main.fadeIn(500, 0, 0, 0);
+
             this.selectedChar = ""; 
             this.add.image(640, 360, 'bg_select').setDisplaySize(1280, 720);
-
             this.add.image(125, 170, 'title_sign').setScale(0.25);
             
             this.anims.create({ key: 'portal_playing', frames: Array.from({length: 8}, (_, i) => ({ key: `portal_${i}` })), frameRate: 5, repeat: -1 });
@@ -70,33 +73,23 @@
 
             this.add.image(660, 170, 'title').setScale(0.45);
 
-            // ==========================================
             // 🎵 BGM 및 토글 버튼
-            // ==========================================
             let soundBtn = this.add.image(1200, 50, 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1);
             let bgm = null;
-
             if (this.cache.audio.exists('bgm_select')) {
                 bgm = this.sound.add('bgm_select', { loop: true, volume: 0.5 });
             }
-
             soundBtn.on('pointerdown', (pointer, localX, localY, event) => {
                 if (event) event.stopPropagation();
                 if (!bgm) return; 
-
                 if (bgm.isPlaying) {
                     bgm.pause(); 
                     soundBtn.setTexture('sound_off'); 
                 } else {
-                    if (bgm.isPaused) {
-                        bgm.resume();
-                    } else {
-                        bgm.play();
-                    }
+                    if (bgm.isPaused) { bgm.resume(); } else { bgm.play(); }
                     soundBtn.setTexture('sound_on'); 
                 }
             });
-            // ==========================================
 
             const chars = ['man', 'woman', 'toben'];
             chars.forEach(char => {
@@ -117,8 +110,15 @@
             womanBtn.on('pointerdown', () => selectCharacter(womanBtn, 'woman'));
             tobenBtn.on('pointerdown', () => selectCharacter(tobenBtn, 'toben'));
             
+            // 스타트 표지판 클릭 시
             this.add.image(1150, 305, 'sign').setScale(0.3).setInteractive().on('pointerdown', () => { 
-                if(this.selectedChar) this.scene.start('VillageScene', { character: this.selectedChar }); 
+                if(this.selectedChar) {
+                    // 💡 마을 인게임으로 진입할 때도 0.5초간 화면이 어두워집니다.
+                    this.cameras.main.fadeOut(500, 0, 0, 0);
+                    this.cameras.main.once('camerafadeoutcomplete', () => {
+                        this.scene.start('VillageScene', { character: this.selectedChar }); 
+                    });
+                }
             });
         }
     }
@@ -127,6 +127,9 @@
         constructor() { super({ key: 'VillageScene' }); }
         init(data) { this.myChar = data.character; }
         create() {
+            // 💡 인게임 마을 씬이 시작되면서 다시 화면이 부드럽게 밝아집니다.
+            this.cameras.main.fadeIn(500, 0, 0, 0);
+
             this.cameras.main.setBackgroundColor('#ffffff');
             this.player = this.physics.add.sprite(640, 360, `${this.myChar}_stand1_0`).setScale(1.5).setOrigin(0.5, 1).setCollideWorldBounds(true).setBounce(0);
             
