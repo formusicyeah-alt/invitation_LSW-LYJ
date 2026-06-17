@@ -30,6 +30,9 @@
             this.load.image('sound_off', 'images/sound_off.png');
             this.load.audio('bgm_select', 'audio/bgm_select.mp3');
 
+            this.load.image('bg_wedding_village', 'images/bg_wedding_village.png');
+            this.load.audio('bgm_wedding_village', 'audio/bgm_wedding_village.mp3');
+
             const chars = ['man', 'woman', 'toben'];
             chars.forEach(char => {
                 for(let z=0; z<=3; z++) this.load.image(`${char}_stand1_${z}`, `images/${char}_stand1_${z}.png`);
@@ -44,8 +47,7 @@
             this.add.sprite(640, 360, 'invit_0').setScale(2).play('invit_playing').setInteractive().on('pointerup', () => {
                 try { if (!this.scale.isFullscreen) this.scale.startFullscreen(); } catch (e) {}
                 
-                // 💡 클릭 시 바로 전환되지 않고, 1.5초간 어두워진(Fade Out) 후 전환됩니다.
-                this.cameras.main.fadeOut(1500, 0, 0, 0);
+                this.cameras.main.fadeOut(500, 0, 0, 0);
                 this.cameras.main.once('camerafadeoutcomplete', () => {
                     this.scene.start('SelectScene');
                 });
@@ -58,10 +60,11 @@
         preload() {}
 
         create() {
-            // 💡 이전 씬에서 어두워진 상태로 오기 때문에, 0.5초간 다시 밝아지는(Fade In) 효과를 줍니다.
             this.cameras.main.fadeIn(500, 0, 0, 0);
 
             this.selectedChar = ""; 
+            this.isSoundOn = false; 
+            
             this.add.image(640, 360, 'bg_select').setDisplaySize(1280, 720);
             this.add.image(125, 170, 'title_sign').setScale(0.25);
             
@@ -73,7 +76,6 @@
 
             this.add.image(660, 170, 'title').setScale(0.45);
 
-            // 🎵 BGM 및 토글 버튼
             let soundBtn = this.add.image(1200, 50, 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1);
             let bgm = null;
             if (this.cache.audio.exists('bgm_select')) {
@@ -85,9 +87,11 @@
                 if (bgm.isPlaying) {
                     bgm.pause(); 
                     soundBtn.setTexture('sound_off'); 
+                    this.isSoundOn = false;
                 } else {
                     if (bgm.isPaused) { bgm.resume(); } else { bgm.play(); }
                     soundBtn.setTexture('sound_on'); 
+                    this.isSoundOn = true;
                 }
             });
 
@@ -110,13 +114,23 @@
             womanBtn.on('pointerdown', () => selectCharacter(womanBtn, 'woman'));
             tobenBtn.on('pointerdown', () => selectCharacter(tobenBtn, 'toben'));
             
-            // 스타트 표지판 클릭 시
             this.add.image(1150, 305, 'sign').setScale(0.3).setInteractive().on('pointerdown', () => { 
                 if(this.selectedChar) {
-                    // 💡 마을 인게임으로 진입할 때도 0.5초간 화면이 어두워집니다.
                     this.cameras.main.fadeOut(500, 0, 0, 0);
                     this.cameras.main.once('camerafadeoutcomplete', () => {
-                        this.scene.start('VillageScene', { character: this.selectedChar }); 
+                        if (bgm && bgm.isPlaying) {
+                            this.tweens.add({
+                                targets: bgm,
+                                volume: 0,
+                                duration: 500,
+                                onComplete: () => {
+                                    bgm.stop();
+                                    this.scene.start('VillageScene', { character: this.selectedChar, isSoundOn: this.isSoundOn }); 
+                                }
+                            });
+                        } else {
+                            this.scene.start('VillageScene', { character: this.selectedChar, isSoundOn: this.isSoundOn }); 
+                        }
                     });
                 }
             });
@@ -125,45 +139,141 @@
 
     class VillageScene extends Phaser.Scene {
         constructor() { super({ key: 'VillageScene' }); }
-        init(data) { this.myChar = data.character; }
+        init(data) { 
+            this.myChar = data.character; 
+            this.isSoundOn = data.isSoundOn;
+        }
         create() {
-            // 💡 인게임 마을 씬이 시작되면서 다시 화면이 부드럽게 밝아집니다.
             this.cameras.main.fadeIn(500, 0, 0, 0);
 
-            this.cameras.main.setBackgroundColor('#ffffff');
-            this.player = this.physics.add.sprite(640, 360, `${this.myChar}_stand1_0`).setScale(1.5).setOrigin(0.5, 1).setCollideWorldBounds(true).setBounce(0);
+            this.add.image(0, 0, 'bg_wedding_village').setOrigin(0, 0).setScale(0.5);
+
+            this.physics.world.setBounds(0, 0, 3016, 1245);
+            this.cameras.main.setBounds(0, 0, 3016, 1245);
+
+            this.player = this.physics.add.sprite(200, 280, `${this.myChar}_stand1_0`).setScale(1.5).setOrigin(0.5, 1).setCollideWorldBounds(true).setBounce(0);
             
+            this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+
             this.anims.create({ key: `${this.myChar}_jump_up`, frames: [{ key: `${this.myChar}_jump_0` }], frameRate: 1 });
             this.anims.create({ key: `${this.myChar}_jump_peak`, frames: [{ key: `${this.myChar}_jump_1` }], frameRate: 1 });
             
-            let ground = this.add.rectangle(640, 710, 1280, 20, 0x00ff00, 1); 
-            this.physics.add.existing(ground, true); 
-            this.physics.add.collider(this.player, ground); 
+            // =======================================================
+            // 🧱 다중 바닥 및 발판 설정 구역 (알려주신 좌표 적용)
+            // =======================================================
+            let grounds = [
+                // 1. 메인 바닥 (전체 맵 길이)
+                this.add.rectangle(3016/2, 1245-115, 3016, 20, 0x00ff00, 0),
+
+                // 2. 추가 발판 0 (캐릭터가 생성되는 위치)
+                this.add.rectangle(200, 450, 550, 20, 0x00ff00, 0),
+
+                // 3. 추가 발판 1
+                this.add.rectangle(235, 540, 60, 20, 0x00ff00, 0),
+
+                // 4. 추가 발판 2
+                this.add.rectangle(235, 650, 60, 20, 0x00ff00, 0),
+
+                // 5. 추가 발판 3
+                this.add.rectangle(530, 680, 390, 20, 0x00ff00, 0)
+            ];
+
+            // 💡 [변경점] 만들어진 발판들을 '원웨이(One-Way)'로 만들어 머리를 찧지 않게 합니다.
+            grounds.forEach(ground => {
+                this.physics.add.existing(ground, true); 
+                
+                // 캐릭터가 위에서 아래로 떨어질 때(발판의 윗면)만 충돌을 감지하도록 설정합니다.
+                ground.body.checkCollision.down = false;  // 발판 밑바닥 통과 허용
+                ground.body.checkCollision.left = false;  // 발판 왼쪽 통과 허용
+                ground.body.checkCollision.right = false; // 발판 오른쪽 통과 허용
+
+                this.physics.add.collider(this.player, ground); 
+            });
+            // =======================================================
             
+            // ⌨️ 키보드 기본 방향키 입력 활성화
+            this.cursors = this.input.keyboard.createCursorKeys();
+            
+            // ⌨️ 키보드 'Alt' 키 입력 개별 등록
+            this.altKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ALT);
+
             this.controls = { left: false, right: false };
             this.isJumping = false;
 
             const btnStyle = { font: '30px Arial', fill: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', padding: {x: 20, y: 20} };
-            this.add.text(80, 550, '◀', btnStyle).setInteractive().on('pointerdown', () => this.controls.left = true).on('pointerup', () => this.controls.left = false);
-            this.add.text(260, 550, '▶', btnStyle).setInteractive().on('pointerdown', () => this.controls.right = true).on('pointerup', () => this.controls.right = false);
-            this.add.text(1100, 550, '점프', btnStyle).setInteractive().on('pointerdown', () => { 
+            
+            let leftBtn = this.add.text(80, 550, '◀', btnStyle).setInteractive().setScrollFactor(0);
+            leftBtn.on('pointerdown', () => this.controls.left = true).on('pointerup', () => this.controls.left = false);
+            
+            let rightBtn = this.add.text(260, 550, '▶', btnStyle).setInteractive().setScrollFactor(0);
+            rightBtn.on('pointerdown', () => this.controls.right = true).on('pointerup', () => this.controls.right = false);
+            
+            let jumpBtn = this.add.text(1100, 550, '점프', btnStyle).setInteractive().setScrollFactor(0);
+            jumpBtn.on('pointerdown', () => { 
                 if (this.player.body.blocked.down) {
-                    this.player.setVelocityY(-420);
+                    this.player.setVelocityY(-550); 
                     this.isJumping = true;
+                }
+            });
+
+            let soundBtn = this.add.image(1200, 50, this.isSoundOn ? 'sound_on' : 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1).setScrollFactor(0);
+            let bgm = null;
+
+            if (this.cache.audio.exists('bgm_wedding_village')) {
+                bgm = this.sound.add('bgm_wedding_village', { loop: true, volume: 0 });
+                
+                if (this.isSoundOn) {
+                    bgm.play();
+                    this.tweens.add({ targets: bgm, volume: 0.5, duration: 1000 });
+                }
+            }
+
+            soundBtn.on('pointerdown', (pointer, localX, localY, event) => {
+                if (event) event.stopPropagation();
+                if (!bgm) return; 
+
+                if (bgm.isPlaying && bgm.volume > 0) {
+                    bgm.pause(); 
+                    soundBtn.setTexture('sound_off'); 
+                    this.isSoundOn = false;
+                } else {
+                    if (bgm.isPaused) {
+                        bgm.resume();
+                    } else {
+                        bgm.play();
+                    }
+                    bgm.volume = 0.5;
+                    soundBtn.setTexture('sound_on'); 
+                    this.isSoundOn = true;
                 }
             });
         }
         update() {
             if (this.player.body.blocked.down) this.isJumping = false;
-            if (this.controls.left) { this.player.setVelocityX(-300).setFlipX(false); } 
-            else if (this.controls.right) { this.player.setVelocityX(300).setFlipX(true); } 
-            else { this.player.setVelocityX(0); }
+            
+            let moveLeft = this.controls.left || this.cursors.left.isDown;
+            let moveRight = this.controls.right || this.cursors.right.isDown;
+            
+            let jumpPressed = this.altKey.isDown;
+
+            if (moveLeft) { 
+                this.player.setVelocityX(-198).setFlipX(false); 
+            } else if (moveRight) { 
+                this.player.setVelocityX(198).setFlipX(true); 
+            } else { 
+                this.player.setVelocityX(0); 
+            }
+
+            if (jumpPressed && this.player.body.blocked.down) {
+                this.player.setVelocityY(-550);
+                this.isJumping = true;
+            }
 
             if (this.isJumping) {
                 if (Math.abs(this.player.body.velocity.y) < 50) { this.player.anims.play(`${this.myChar}_jump_peak`, true); } 
                 else { this.player.anims.play(`${this.myChar}_jump_up`, true); }
             } else {
-                if (this.controls.left || this.controls.right) { this.player.anims.play(`${this.myChar}_walking`, true); } 
+                if (moveLeft || moveRight) { this.player.anims.play(`${this.myChar}_walking`, true); } 
                 else { this.player.anims.play(`${this.myChar}_breathing`, true); }
             }
         }
