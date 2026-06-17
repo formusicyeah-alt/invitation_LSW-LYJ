@@ -22,9 +22,15 @@
         preload() {
             for (let i = 0; i <= 20; i++) this.load.image(`invit_${i}`, `images/invit_${i}.png`);
             this.load.image('bg_select', 'images/bg_select.png'); 
-            this.load.image('sign', 'images/sign.png'); // [수정] 입장 버튼 이미지 로드
-            this.load.image('title_sign', 'images/title_sign.png'); // 타이틀 안내판 이미지 로드
-            this.load.image('title', 'images/title.png'); // 타이틀 이미지 로드
+            this.load.image('sign', 'images/sign.png'); 
+            this.load.image('title_sign', 'images/title_sign.png'); 
+            this.load.image('title', 'images/title.png'); 
+            
+            // 💡 무거운 사운드 에셋을 첫 화면에서 미리 로드하여 전환 렉을 방지합니다.
+            this.load.image('sound_on', 'images/sound_on.png');
+            this.load.image('sound_off', 'images/sound_off.png');
+            this.load.audio('bgm_select', 'audio/bgm_select.mp3');
+
             const chars = ['man', 'woman', 'toben'];
             chars.forEach(char => {
                 for(let z=0; z<=3; z++) this.load.image(`${char}_stand1_${z}`, `images/${char}_stand1_${z}.png`);
@@ -45,12 +51,16 @@
 
     class SelectScene extends Phaser.Scene {
         constructor() { super({ key: 'SelectScene' }); }
+        
+        preload() {
+            // 첫 씬에서 로드하므로 여기는 비워둡니다. (렉 제거 핵심)
+        }
+
         create() {
             this.selectedChar = ""; 
             this.add.image(640, 360, 'bg_select').setDisplaySize(1280, 720);
 
             this.add.image(125, 170, 'title_sign').setScale(0.25);
-            
             
             this.anims.create({ key: 'portal_playing', frames: Array.from({length: 8}, (_, i) => ({ key: `portal_${i}` })), frameRate: 5, repeat: -1 });
             this.add.sprite(300, 500, 'portal_0').setOrigin(0.2, 1).setScale(1.5).play('portal_playing');
@@ -59,6 +69,34 @@
             this.spotlight = this.add.sprite(-200, -200, 'sprite_0').setScale(2).play('spotlight_playing').setVisible(false);
 
             this.add.image(660, 170, 'title').setScale(0.45);
+
+            // ==========================================
+            // 🎵 BGM 및 토글 버튼
+            // ==========================================
+            let soundBtn = this.add.image(1200, 50, 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1);
+            let bgm = null;
+
+            if (this.cache.audio.exists('bgm_select')) {
+                bgm = this.sound.add('bgm_select', { loop: true, volume: 0.5 });
+            }
+
+            soundBtn.on('pointerdown', (pointer, localX, localY, event) => {
+                if (event) event.stopPropagation();
+                if (!bgm) return; 
+
+                if (bgm.isPlaying) {
+                    bgm.pause(); 
+                    soundBtn.setTexture('sound_off'); 
+                } else {
+                    if (bgm.isPaused) {
+                        bgm.resume();
+                    } else {
+                        bgm.play();
+                    }
+                    soundBtn.setTexture('sound_on'); 
+                }
+            });
+            // ==========================================
 
             const chars = ['man', 'woman', 'toben'];
             chars.forEach(char => {
@@ -79,7 +117,6 @@
             womanBtn.on('pointerdown', () => selectCharacter(womanBtn, 'woman'));
             tobenBtn.on('pointerdown', () => selectCharacter(tobenBtn, 'toben'));
             
-            // [수정] sign.png 버튼 배치 (좌표 1150, 500 및 크기 1/5)
             this.add.image(1150, 305, 'sign').setScale(0.3).setInteractive().on('pointerdown', () => { 
                 if(this.selectedChar) this.scene.start('VillageScene', { character: this.selectedChar }); 
             });
@@ -129,7 +166,16 @@
         }
     }
 
-    const config = { type: Phaser.AUTO, width: 1280, height: 720, parent: 'game-container', physics: { default: 'arcade', arcade: { gravity: { y: 1200 } } }, scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, scene: [StartScene, SelectScene, VillageScene] };
+    const config = { 
+        type: Phaser.AUTO, 
+        width: 1280, 
+        height: 720, 
+        parent: 'game-container', 
+        render: { pixelArt: true },
+        physics: { default: 'arcade', arcade: { gravity: { y: 1200 } } }, 
+        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, 
+        scene: [StartScene, SelectScene, VillageScene] 
+    };
     new Phaser.Game(config);
 </script>
 </body>
