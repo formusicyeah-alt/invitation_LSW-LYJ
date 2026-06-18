@@ -511,7 +511,7 @@
             this.add.text(1100, 600, '점프', btnStyle).setInteractive().setScrollFactor(0).setDepth(9999)
                 .on('pointerdown', () => {
                     if (this.player.body.blocked.down) {
-                        this.player.setVelocityY(-300);
+                        this.player.setVelocityY(-400);
                         if (!this.isJumping) this.sound.play('bgm_jump');
                         this.isJumping = true;
                     }
@@ -650,7 +650,7 @@
         physics: {
             default: 'arcade',
             arcade: {
-                gravity: { y: 1800 },
+                gravity: { y: 1200 },
                 roundPixels: true // 물리 바운딩 박스 정수 변환 처리
             }
         },
