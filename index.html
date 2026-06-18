@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>이승원,이유진 결혼합니다.</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background-color: #000; }
+        #game-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; z-index: 1; }
+        #portrait-warning { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #ffffff; color: #000000; display: none; justify-content: center; align-items: center; z-index: 9999; text-align: center; font-family: "Arial", sans-serif; }
+        @media screen and (orientation: portrait) { #portrait-warning { display: flex; } }
+        
+        /* 💡 캔버스 자체의 스타일링을 통해 브라우저 확대 시 화질 저하 추가 방지 */
+        canvas {
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+        }
+    </style>
+</head>
+<body>
+<div id="portrait-warning"><h1>📱<br><br>화면을 가로로 돌려주세요!</h1></div>
+<div id="game-container"></div>
+
+<script>
+    class StartScene extends Phaser.Scene {
+        constructor() { super({ key: 'StartScene' }); }
+        preload() {
+            for (let i = 0; i <= 20; i++) this.load.image(`invit_${i}`, `images/invit_${i}.png`);
+            this.load.image('bg_select', 'images/bg_select.png'); 
+            this.load.image('sign', 'images/sign.png'); 
+            this.load.image('title_sign', 'images/title_sign.png'); 
+            this.load.image('title', 'images/title.png'); 
+            
+            this.load.image('sound_on', 'images/sound_on.png');
+            this.load.image('sound_off', 'images/sound_off.png');
+            this.load.audio('bgm_select', 'audio/bgm_select.mp3');
+
+            this.load.image('bg_wedding_village', 'images/bg_wedding_village.png');
+            this.load.audio('bgm_wedding_village', 'audio/bgm_wedding_village.mp3');
+
+            const chars = ['man', 'woman', 'toben'];
+            chars.forEach(char => {
+                for(let z=0; z<=3; z++) this.load.image(`${char}_stand1_${z}`, `images/${char}_stand1_${z}.png`);
+                for(let z=0; z<=4; z++) this.load.image(`${char}_walk1_${z}`, `images/${char}_walk1_${z}.png`);
+                for(let z=0; z<=1; z++) this.load.image(`${char}_jump_${z}`, `images/${char}_jump_${z}.png`);
+            });
+            // 이미지 로드
+            for (let i = 0; i <= 7; i++) this.load.image(`portal_${i}`, `images/portal_${i}.png`);
+            for (let i = 1; i <= 5; i++) this.load.image(`hiden_portal_${i}`, `images/hiden_portal_${i}.png`);
+            for (let i = 0; i <= 5; i++) this.load.image(`sprite_${i}`, `images/sprite_${i}.png`);
+        }
+        create() {
+            this.anims.create({ key: 'invit_playing', frames: Array.from({length:21}, (_,i)=>({key:`invit_${i}`})), frameRate: 12, repeat: -1 });
+            this.add.sprite(640, 360, 'invit_0').setScale(2).play('invit_playing').setInteractive().on('pointerup', () => {
+                try { if (!this.scale.isFullscreen) this.scale.startFullscreen(); } catch (e) {}
+                
+                this.cameras.main.fadeOut(1000, 0, 0, 0);
+                this.cameras.main.once('camerafadeoutcomplete', () => {
+                    this.scene.start('SelectScene');
+                });
+            });
+        }
+    }
+
+    class SelectScene extends Phaser.Scene {
+        constructor() { super({ key: 'SelectScene' }); }
+        preload() {}
+
+        create() {
+            this.cameras.main.fadeIn(1000, 0, 0, 0);
+
+            this.selectedChar = ""; 
+            this.isSoundOn = false; 
+            
+            this.add.image(640, 360, 'bg_select').setDisplaySize(1280, 720);
+            this.add.image(125, 170, 'title_sign').setScale(0.25);
+            
+            this.anims.create({ key: 'portal_playing', frames: Array.from({length: 8}, (_, i) => ({ key: `portal_${i}` })), frameRate: 5, repeat: -1 });
+            this.add.sprite(300, 500, 'portal_0').setOrigin(0.2, 1).setScale(1.5).play('portal_playing');
+
+            this.anims.create({ key: 'spotlight_playing', frames: Array.from({length: 6}, (_, i) => ({ key: `sprite_${i}` })), frameRate: 10, repeat: -1 });
+            this.spotlight = this.add.sprite(-200, -200, 'sprite_0').setScale(2).play('spotlight_playing').setVisible(false);
+
+            this.add.image(660, 170, 'title').setScale(0.45);
+
+            let soundBtn = this.add.image(1200, 50, 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1);
+            let bgm = null;
+            if (this.cache.audio.exists('bgm_select')) {
+                bgm = this.sound.add('bgm_select', { loop: true, volume: 0.5 });
+            }
+            soundBtn.on('pointerdown', (pointer, localX, localY, event) => {
+                if (event) event.stopPropagation();
+                if (!bgm) return; 
+                if (bgm.isPlaying) {
+                    bgm.pause(); 
+                    soundBtn.setTexture('sound_off'); 
+                    this.isSoundOn = false;
+                } else {
+                    if (bgm.isPaused) { bgm.resume(); } else { bgm.play(); }
+                    soundBtn.setTexture('sound_on'); 
+                    this.isSoundOn = true;
+                }
+            });
+
+            const chars = ['man', 'woman', 'toben'];
+            chars.forEach(char => {
+                this.anims.create({ key: `${char}_breathing`, frames: [ { key: `${char}_stand1_0` }, { key: `${char}_stand1_0` }, { key: `${char}_stand1_1` }, { key: `${char}_stand1_1` }, { key: `${char}_stand1_2` }, { key: `${char}_stand1_2` }, { key: `${char}_stand1_3` }, { key: `${char}_stand1_3` } ], frameRate: 6, repeat: -1 });
+                this.anims.create({ key: `${char}_walking`, frames: [ { key: `${char}_walk1_0` }, { key: `${char}_walk1_1` }, { key: `${char}_walk1_2` }, { key: `${char}_walk1_3` }, { key: `${char}_walk1_4` } ], frameRate: 6, repeat: -1 });
+            });
+            let manBtn = this.add.sprite(500, 550, 'man_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('man_breathing');
+            let womanBtn = this.add.sprite(725, 550, 'woman_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('woman_breathing');
+            let tobenBtn = this.add.sprite(950, 550, 'toben_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('toben_breathing');
+            
+            const selectCharacter = (targetBtn, charName) => {
+                [manBtn, womanBtn, tobenBtn].forEach(b => { b.setAlpha(0.5); b.play(b.texture.key.split('_')[0] + '_breathing'); });
+                targetBtn.setAlpha(1).play(`${charName}_walking`);
+                this.selectedChar = charName; 
+                this.spotlight.setVisible(true).setPosition(targetBtn.x, targetBtn.y - 250);
+            };
+            manBtn.on('pointerdown', () => selectCharacter(manBtn, 'man'));
+            womanBtn.on('pointerdown', () => selectCharacter(womanBtn, 'woman'));
+            tobenBtn.on('pointerdown', () => selectCharacter(tobenBtn, 'toben'));
+            
+            this.add.image(1150, 305, 'sign').setScale(0.3).setInteractive().on('pointerdown', () => { 
+                if(this.selectedChar) {
+                    this.cameras.main.fadeOut(1000, 0, 0, 0);
+                    this.cameras.main.once('camerafadeoutcomplete', () => {
+                        if (bgm && bgm.isPlaying) {
+                            this.tweens.add({
+                                targets: bgm,
+                                volume: 0,
+                                duration: 500,
+                                onComplete: () => {
+                                    bgm.stop();
+                                    this.scene.start('VillageScene', { character: this.selectedChar, isSoundOn: this.isSoundOn }); 
+                                }
+                            });
+                        } else {
+                            this.scene.start('VillageScene', { character: this.selectedChar, isSoundOn: this.isSoundOn }); 
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    class VillageScene extends Phaser.Scene {
+        constructor() { super({ key: 'VillageScene' }); }
+        init(data) { 
+            this.myChar = data.character; 
+            this.isSoundOn = data.isSoundOn;
+        }
+
+        preload() {
+            // 1. 고정 NPC 이미지 로드
+            this.load.image('bride_fa_sit', 'images/bride_fa_sit.png');
+            this.load.image('bride_mo_sit', 'images/bride_mo_sit.png');
+            this.load.image('groom_fa_sit', 'images/groom_fa_sit.png');
+            this.load.image('groom_mo_sit', 'images/groom_mo_sit.png');
+
+            // 2. 움직이는 NPC 이미지 시퀀스 로드
+            for (let i = 0; i <= 9; i++) this.load.image(`GM_${i}`, `images/GM_${i}.png`);
+            for (let i = 0; i <= 11; i++) this.load.image(`spinel_${i}`, `images/spinel_${i}.png`);
+            for (let i = 0; i <= 7; i++) this.load.image(`warena_${i}`, `images/warena_${i}.png`);
+            
+            // 💍 [추가] 신랑 신부 NPC 이미지 시퀀스 로드 (0~3프레임)
+            for (let i = 0; i <= 3; i++) this.load.image(`groom_stand1_${i}`, `images/groom_stand1_${i}.png`);
+            for (let i = 0; i <= 3; i++) this.load.image(`bride_stand1_${i}`, `images/bride_stand1_${i}.png`);
+            
+            // 📸 카메라 NPC 및 편지 NPC 이미지 로드
+            for (let i = 0; i <= 3; i++) this.load.image(`camera_${i}`, `images/camera_${i}.png`);
+            for (let i = 0; i <= 5; i++) this.load.image(`letter_${i}`, `images/letter_${i}.png`);
+
+            // 3. 패턴 1개짜리 말풍선 로드
+            this.load.image('text_spinel', 'images/text_spinel.png');
+            this.load.image('text_warena', 'images/text_warena.png');
+            this.load.image('text_bride_pa', 'images/text_bride_pa.png');
+            this.load.image('text_groom_pa', 'images/text_groom_pa.png');
+            
+            // 📸 카메라 및 편지 NPC 말풍선 로드
+            this.load.image('text_camera', 'images/text_camera.png');
+            this.load.image('text_letter', 'images/text_letter.png');
+
+            // 4. 패턴 2개짜리 말풍선 로드
+            this.load.image('text_bride_1', 'images/text_bride_1.png');
+            this.load.image('text_bride_2', 'images/text_bride_2.png');
+            this.load.image('text_groom_1', 'images/text_groom_1.png');
+            this.load.image('text_groom_2', 'images/text_groom_2.png');
+            this.load.image('text_GM_1', 'images/text_GM_1.png');
+            this.load.image('text_GM_2', 'images/text_GM_2.png');
+        }
+
+        create() {
+            this.cameras.main.fadeIn(1000, 0, 0, 0);
+
+            this.add.image(0, 0, 'bg_wedding_village').setOrigin(0, 0).setScale(0.5);
+
+            // 움직이는 NPC 전용 애니메이션 데이터 생성
+            this.anims.create({ key: 'anim_GM', frames: Array.from({length: 10}, (_, i) => ({ key: `GM_${i}` })), frameRate: 6, repeat: -1 });
+            this.anims.create({ key: 'anim_spinel', frames: Array.from({length: 12}, (_, i) => ({ key: `spinel_${i}` })), frameRate: 6, repeat: -1 });
+            this.anims.create({ key: 'anim_warena', frames: Array.from({length: 8}, (_, i) => ({ key: `warena_${i}` })), frameRate: 6, repeat: -1 });
+            
+            // 💍 [추가] 신랑 신부 전용 애니메이션 데이터 생성
+            this.anims.create({ key: 'anim_groom', frames: Array.from({length: 4}, (_, i) => ({ key: `groom_stand1_${i}` })), frameRate: 6, repeat: -1 });
+            this.anims.create({ key: 'anim_bride', frames: Array.from({length: 4}, (_, i) => ({ key: `bride_stand1_${i}` })), frameRate: 6, repeat: -1 });
+            
+            // 📸 카메라 및 편지 NPC 애니메이션 생성
+            this.anims.create({ key: 'anim_camera', frames: Array.from({length: 4}, (_, i) => ({ key: `camera_${i}` })), frameRate: 6, repeat: -1 });
+            this.anims.create({ key: 'anim_letter', frames: Array.from({length: 6}, (_, i) => ({ key: `letter_${i}` })), frameRate: 6, repeat: -1 });
+
+            // 바닥선 높이 설정
+            const floorY = 1120;
+
+            // (1) 고정 NPC 배치 생성
+            let npc_bride_fa = this.add.image(1180, 755, 'bride_fa_sit').setOrigin(0.5, 1).setScale(1.5).setDepth(5); // 신부 아버지 NPC
+            let npc_bride_mo = this.add.image(1100, 755, 'bride_mo_sit').setOrigin(0.5, 1).setScale(1.5).setDepth(5); // 신부 어머니 NPC
+            let npc_groom_fa = this.add.image(410, 645, 'groom_fa_sit').setOrigin(0.5, 1).setScale(1.5).setDepth(5); // 신랑 아버지 NPC
+            let npc_groom_mo = this.add.image(490, 645, 'groom_mo_sit').setOrigin(0.5, 1).setScale(1.5).setDepth(5); // 신랑 어머니 NPC
+
+            // (2) 움직이는 NPC 배치 생성 및 애니메이션 가동
+            let npc_GM = this.add.sprite(290, 1085, 'GM_0').setOrigin(0.5, 1).setScale(1.5).setDepth(5).play('anim_GM'); // 운영자
+            let npc_spinel = this.add.sprite(1450, 1085, 'spinel_0').setOrigin(0.5, 1).setScale(1.5).setDepth(5).play('anim_spinel'); // 스피넬, 맵 안내, 오시는 길 안내
+            let npc_warena = this.add.sprite(650, 1085, 'warena_0').setOrigin(0.5, 1).setScale(1.5).setDepth(5).play('anim_warena'); // 워레나, 축의 정보
+            
+            // 💍 [추가] 신랑 신부 NPC 지정 좌표에 배치 생성 및 가동
+            let npc_groom = this.add.sprite(1075, 490, 'groom_stand1_0').setOrigin(0.5, 1).setScale(1.5).setDepth(5).play('anim_groom');
+            let npc_bride = this.add.sprite(1160, 490, 'bride_stand1_0').setOrigin(0.5, 1).setScale(1.5).setDepth(5).play('anim_bride');
+            
+            // 📸 추가된 움직이는 NPC (좌표 임의 설정) + 좌우반전(.setFlipX(true)) 적용!
+            let npc_camera = this.add.sprite(850, 1085, 'camera_0').setOrigin(0, 1).setScale(1.5).setDepth(5).setFlipX(true).play('anim_camera'); // 카메라 NPC
+            let npc_letter = this.add.sprite(2100, 780, 'letter_0').setOrigin(0.5, 1).setScale(1.5).setDepth(5).setFlipX(true).play('anim_letter'); // 편지 NPC
+
+            // =======================================================
+            // 💬 말풍선 오브젝트 생성 및 선명도 필터 강제 고정
+            // =======================================================
+            // [패턴 1] 말풍선 1개 연출 등록
+            let bubble_spinel = this.add.image(npc_spinel.x - 20, npc_spinel.y - 115, 'text_spinel').setOrigin(0.5, 1).setDepth(12).setVisible(false); // 스피넬 말풍선
+            let bubble_warena = this.add.image(npc_warena.x + 20, npc_warena.y - 115, 'text_warena').setOrigin(0.5, 1).setDepth(12).setVisible(false); // 워레나 말풍선
+            let bubble_bride_pa = this.add.image(npc_bride_fa.x - 50, npc_bride_fa.y - 100, 'text_bride_pa').setOrigin(0.5, 1).setDepth(12).setVisible(false); // 신부 혼주 말풍선
+            let bubble_groom_pa = this.add.image(npc_groom_fa.x + 50, npc_groom_fa.y - 100, 'text_groom_pa').setOrigin(0.5, 1).setDepth(12).setVisible(false); // 신랑 혼주 말풍선
+            
+            // 📸 추가된 NPC들의 말풍선 1개 연출 등록
+            let bubble_camera = this.add.image(npc_camera.x + 60, npc_camera.y - 123, 'text_camera').setOrigin(0.5, 1).setDepth(12).setVisible(false); // 카메라 말풍선
+            let bubble_letter = this.add.image(npc_letter.x + 20, npc_letter.y - 115, 'text_letter').setOrigin(0.5, 1).setDepth(12).setVisible(false); // 편지 말풍선
+
+            // [패턴 2] 말풍선 2개 릴레이 연출 등록 (💡 가상 좌표 제거 및 신랑/신부 NPC 위치 연동 적용)
+            let bubble_bride_1 = this.add.image(npc_bride.x + 20, npc_bride.y - 115, 'text_bride_1').setOrigin(0.5, 1).setDepth(12).setVisible(false); // 신부 말풍선 1
+            let bubble_bride_2 = this.add.image(npc_bride.x + 20, npc_bride.y - 115, 'text_bride_2').setOrigin(0.5, 1).setDepth(12).setVisible(false); // 신부 말풍선 2
+
+            let bubble_groom_1 = this.add.image(npc_groom.x - 20, npc_groom.y - 115, 'text_groom_1').setOrigin(0.5, 1).setDepth(12).setVisible(false); // 신랑 말풍선 1
+            let bubble_groom_2 = this.add.image(npc_groom.x - 20, npc_groom.y - 115, 'text_groom_2').setOrigin(0.5, 1).setDepth(12).setVisible(false); // 신랑 말풍선 2
+
+            let bubble_GM_1 = this.add.image(npc_GM.x + 20, npc_GM.y - 115, 'text_GM_1').setOrigin(0.5, 1).setDepth(12).setVisible(false); // 운영자 말풍선 1
+            let bubble_GM_2 = this.add.image(npc_GM.x + 20, npc_GM.y - 115, 'text_GM_2').setOrigin(0.5, 1).setDepth(12).setVisible(false); // 운영자 말풍선 2
+
+            // 💡 모든 말풍선 텍스처를 흐림 현상 없는 NEAREST 필터 모드로 명시적 셋팅
+            const allBubbles = [
+                bubble_spinel, bubble_warena, bubble_bride_pa, bubble_groom_pa,
+                bubble_bride_1, bubble_bride_2, bubble_groom_1, bubble_groom_2, bubble_GM_1, bubble_GM_2,
+                bubble_camera, bubble_letter
+            ];
+            allBubbles.forEach(bubble => {
+                if (bubble && bubble.texture) {
+                    bubble.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+                }
+            });
+            // =======================================================
+
+            // =======================================================
+            // 🎲 말풍선 개별 랜덤 시작 타이머 설정 (3초 안 랜덤 스폰)
+            // =======================================================
+            
+            // [패턴 1] 1개짜리 단독 말풍선들 (4초 주기 루프를 개별적으로 엇갈리게 랜덤 스타트)
+            const pattern1Bubbles = [bubble_spinel, bubble_warena, bubble_bride_pa, bubble_groom_pa, bubble_camera, bubble_letter];
+            pattern1Bubbles.forEach(bubble => {
+                let randomDelay = Phaser.Math.Between(0, 3000); // 0초 ~ 3초 사이의 임의의 시간 선택
+                this.time.delayedCall(randomDelay, () => {
+                    // 최초 1회 등장 처리
+                    bubble.setVisible(true);
+                    this.time.delayedCall(2000, () => bubble.setVisible(false));
+
+                    // 그 이후부터는 4초 주기로 무한 반복 활성화
+                    this.time.addEvent({
+                        delay: 4000,
+                        loop: true,
+                        callback: () => {
+                            bubble.setVisible(true);
+                            this.time.delayedCall(2000, () => bubble.setVisible(false));
+                        }
+                    });
+                });
+            });
+
+            // [패턴 2] 2개짜리 릴레이 말풍선들 (7.5초 주기 루프를 신부/신랑/운영자 별로 각각 랜덤 스타트)
+            const setupRelayTimer = (b1, b2) => {
+                let randomDelay = Phaser.Math.Between(0, 3000); // 0초 ~ 3초 사이의 임의의 시간 선택
+                this.time.delayedCall(randomDelay, () => {
+                    // 최초 1회 릴레이 연출 작동
+                    b1.setVisible(true);
+                    this.time.delayedCall(2000, () => {
+                        b1.setVisible(false);
+                        this.time.delayedCall(500, () => {
+                            b2.setVisible(true);
+                            this.time.delayedCall(2000, () => b2.setVisible(false));
+                        });
+                    });
+
+                    // 그 이후부터는 7.5초 주기로 무한 릴레이 반복 활성화
+                    this.time.addEvent({
+                        delay: 7500,
+                        loop: true,
+                        callback: () => {
+                            b1.setVisible(true);
+                            this.time.delayedCall(2000, () => {
+                                b1.setVisible(false);
+                                this.time.delayedCall(500, () => {
+                                    b2.setVisible(true);
+                                    this.time.delayedCall(2000, () => b2.setVisible(false));
+                                });
+                            });
+                        }
+                    });
+                });
+            };
+
+            // 신부, 신랑, 운영자가 각각 독립적으로 3초 이내에 첫 대화를 시작합니다.
+            setupRelayTimer(bubble_bride_1, bubble_bride_2);
+            setupRelayTimer(bubble_groom_1, bubble_groom_2);
+            setupRelayTimer(bubble_GM_1, bubble_GM_2);
+            // =======================================================
+
+            // 포탈 생성 구역
+            this.add.sprite(120, 418, 'portal_0').setOrigin(0.5, 1).setScale(1.5).play('portal_playing');
+
+            // 히든 포탈 생성 구역
+            this.anims.create({
+                key: 'hiden_portal_playing',
+                frames: Array.from({ length: 5 }, (_, i) => ({ key: `hiden_portal_${i}` })),
+                frameRate: 6,
+                repeat: -1
+            });
+
+            this.add.sprite(645, 655, 'hiden_portal_0').setOrigin(0.5, 1).setScale(1.5).play('hiden_portal_playing');
+            this.add.sprite(1270, 750, 'hiden_portal_0').setOrigin(0.5, 1).setScale(1.3).play('hiden_portal_playing');
+            this.add.sprite(1815, 1095, 'hiden_portal_0').setOrigin(0.5, 1).setScale(1.3).play('hiden_portal_playing');
+            this.add.sprite(175, 1095, 'hiden_portal_0').setOrigin(0.5, 1).setScale(1.5).play('hiden_portal_playing');
+
+            this.physics.world.setBounds(0, 0, 3016, 1245);
+            this.cameras.main.setBounds(0, 0, 3016, 1245);
+            
+            // 플레이어 스폰
+            this.player = this.physics.add.sprite(120, 400, `${this.myChar}_stand1_0`).setScale(1.5).setOrigin(0.5, 1).setCollideWorldBounds(true).setBounce(0).setDepth(10);
+            
+            this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+
+            this.anims.create({ key: `${this.myChar}_jump_up`, frames: [{ key: `${this.myChar}_jump_0` }], frameRate: 1 });
+            this.anims.create({ key: `${this.myChar}_jump_peak`, frames: [{ key: `${this.myChar}_jump_1` }], frameRate: 1 });
+            
+            // 다중 바닥 및 발판 설정 구역
+            let grounds = [
+                this.add.rectangle(3016/2, 1245-115, 3016, 20, 0x00ff00, 0),    
+                this.add.rectangle(200, 450, 550, 20, 0x00ff00, 0),
+                this.add.rectangle(235, 540, 60, 20, 0x00ff00, 0),
+                this.add.rectangle(235, 650, 60, 20, 0x00ff00, 0),
+                this.add.rectangle(50, 490, 65, 20, 0x00ff00, 0),
+                this.add.rectangle(50, 600, 65, 20, 0x00ff00, 0),
+                this.add.rectangle(530, 685, 390, 20, 0x00ff00, 0),
+                this.add.rectangle(860, 740, 100, 20, 0x00ff00, 0),
+                this.add.rectangle(1150, 800, 350, 20, 0x00ff00, 0),
+                this.add.rectangle(1400, 820, 5, 10, 0x00ff00, 0),
+                this.add.rectangle(1470, 875, 5, 10, 0x00ff00, 0),
+                this.add.rectangle(2063, 925, 1000, 20, 0x00ff00, 0),
+                this.add.rectangle(1950, 880, 650, 20, 0x00ff00, 0),
+                this.add.rectangle(1980, 825, 600, 20, 0x00ff00, 0),
+                this.add.rectangle(1777.5, 1080, 140, 10, 0x00ff00, 0),
+                this.add.rectangle(1822.5, 1025, 140, 10, 0x00ff00, 0),
+                this.add.rectangle(1865, 970, 140, 10, 0x00ff00, 0),
+                this.add.rectangle(2350, 1053, 870, 10, 0x00ff00, 0),
+                this.add.rectangle(2398, 1002, 595, 10, 0x00ff00, 0),
+                this.add.rectangle(995, 690, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1060, 660, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1100, 610, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1175, 580, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1240, 565, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1300, 535, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1330, 475, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1335, 420, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1325, 365, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1290, 315, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1220, 285, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1145, 300, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1065, 305, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(990, 300, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(930, 340, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(915, 395, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(910, 445, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(940, 495, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(990, 540, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1055, 575, 3, 2, 0x00ff00, 0),
+                this.add.rectangle(1110, 530, 100, 20, 0x00ff00, 0)
+            ];
+
+            grounds.forEach(ground => {
+                this.physics.add.existing(ground, true); 
+                ground.body.checkCollision.down = false;  
+                ground.body.checkCollision.left = false;  
+                ground.body.checkCollision.right = false; 
+                this.physics.add.collider(this.player, ground); 
+            });
+            
+            // 키보드 설정
+            this.cursors = this.input.keyboard.createCursorKeys();
+            this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+            this.controls = { left: false, right: false, up: false, down: false };
+            this.isJumping = false;
+            this.isTeleporting = false; 
+
+            const btnStyle = { font: '30px Arial', fill: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', padding: {x: 20, y: 20} };
+            
+            let leftBtn = this.add.text(60, 550, '◀', btnStyle).setInteractive().setScrollFactor(0);
+            leftBtn.on('pointerdown', () => this.controls.left = true).on('pointerup', () => this.controls.left = false);
+            
+            let rightBtn = this.add.text(220, 550, '▶', btnStyle).setInteractive().setScrollFactor(0);
+            rightBtn.on('pointerdown', () => this.controls.right = true).on('pointerup', () => this.controls.right = false);
+
+            let upBtn = this.add.text(140, 480, '▲', btnStyle).setInteractive().setScrollFactor(0);
+            upBtn.on('pointerdown', () => this.controls.up = true).on('pointerup', () => this.controls.up = false);
+
+            let downBtn = this.add.text(140, 620, '▼', btnStyle).setInteractive().setScrollFactor(0);
+            downBtn.on('pointerdown', () => this.controls.down = true).on('pointerup', () => this.controls.down = false);
+            
+            let jumpBtn = this.add.text(1100, 550, '점프', btnStyle).setInteractive().setScrollFactor(0);
+            jumpBtn.on('pointerdown', () => { 
+                if (this.player.body.blocked.down) {
+                    this.player.setVelocityY(-300); 
+                    this.isJumping = true;
+                }
+            });
+
+            let soundBtn = this.add.image(1200, 50, this.isSoundOn ? 'sound_on' : 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1).setScrollFactor(0);
+            let bgm = null;
+
+            if (this.cache.audio.exists('bgm_wedding_village')) {
+                bgm = this.sound.add('bgm_wedding_village', { loop: true, volume: 0 });
+                if (this.isSoundOn) {
+                    bgm.play();
+                    this.tweens.add({ targets: bgm, volume: 0.5, duration: 1000 });
+                }
+            }
+
+            soundBtn.on('pointerdown', (pointer, localX, localY, event) => {
+                if (event) event.stopPropagation();
+                if (!bgm) return; 
+
+                if (bgm.isPlaying && bgm.volume > 0) {
+                    bgm.pause(); 
+                    soundBtn.setTexture('sound_off'); 
+                    this.isSoundOn = false;
+                } else {
+                    if (bgm.isPaused) bgm.resume();
+                    else bgm.play();
+                    bgm.volume = 0.5;
+                    soundBtn.setTexture('sound_on'); 
+                    this.isSoundOn = true;
+                }
+            });
+
+            // 실시간 좌표 텍스트 생성
+            this.coordText = this.add.text(0, 0, '(0, 0)', {
+                font: '20px Arial',
+                fill: '#ffff00', 
+                backgroundColor: 'rgba(0,0,0,0.7)', 
+                padding: { x: 5, y: 5 }
+            }).setDepth(9999);
+        }
+
+        update() {
+            let pointer = this.input.activePointer;
+            this.coordText.setPosition(pointer.worldX + 15, pointer.worldY + 15);
+            this.coordText.setText(`(${Math.round(pointer.worldX)}, ${Math.round(pointer.worldY)})`);
+
+            if (this.player.body.blocked.down) this.isJumping = false;
+            
+            let moveLeft = this.controls.left || this.cursors.left.isDown;
+            let moveRight = this.controls.right || this.cursors.right.isDown;
+            let moveUp = this.controls.up || this.cursors.up.isDown;
+            
+            let jumpPressed = this.spaceKey.isDown;
+
+            if (moveLeft) { 
+                this.player.setVelocityX(-198).setFlipX(false); 
+            } else if (moveRight) { 
+                this.player.setVelocityX(198).setFlipX(true); 
+            } else { 
+                this.player.setVelocityX(0); 
+            }
+
+            if (jumpPressed && this.player.body.blocked.down) {
+                this.player.setVelocityY(-550);
+                this.isJumping = true;
+            }
+
+            // 포탈 기능
+            if (moveUp && !this.isTeleporting) {
+                if (Phaser.Math.Distance.Between(this.player.x, this.player.y, 120, 418) < 50) {
+                    this.isTeleporting = true;
+                    this.cameras.main.fadeOut(1000, 0, 0, 0);
+                    this.cameras.main.once('camerafadeoutcomplete', () => {
+                        this.game.sound.stopAll(); 
+                        this.scene.start('SelectScene');
+                    });
+                }
+                else if (Phaser.Math.Distance.Between(this.player.x, this.player.y, 645, 655) < 50) {
+                    this.executeTeleport(175, 1095);
+                }
+                else if (Phaser.Math.Distance.Between(this.player.x, this.player.y, 175, 1095) < 50) {
+                    this.executeTeleport(645, 655);
+                }
+                else if (Phaser.Math.Distance.Between(this.player.x, this.player.y, 1270, 750) < 50) {
+                    this.executeTeleport(1815, 1095);
+                }
+                else if (Phaser.Math.Distance.Between(this.player.x, this.player.y, 1815, 1095) < 50) {
+                    this.executeTeleport(1270, 750);
+                }
+            }
+
+            if (this.isJumping) {
+                if (Math.abs(this.player.body.velocity.y) < 50) { this.player.anims.play(`${this.myChar}_jump_peak`, true); } 
+                else { this.player.anims.play(`${this.myChar}_jump_up`, true); }
+            } else {
+                if (moveLeft || moveRight) { this.player.anims.play(`${this.myChar}_walking`, true); } 
+                else { this.player.anims.play(`${this.myChar}_breathing`, true); }
+            }
+        }
+
+        executeTeleport(targetX, targetY) {
+            this.isTeleporting = true; 
+            this.player.setPosition(targetX, targetY); 
+            this.time.delayedCall(300, () => { this.isTeleporting = false; });
+        }
+    }
+
+    // =======================================================
+    // 🧱 렌더러 및 물리 설정 최적화 구역
+    // =======================================================
+    const config = { 
+        type: Phaser.AUTO, 
+        width: 1280, 
+        height: 720, 
+        parent: 'game-container', 
+        render: { 
+            pixelArt: true,
+            roundPixels: true // 💡 카메라 및 오브젝트 소수점 좌표 연산 방지 (흐림 현상 제거)
+        },
+        physics: { 
+            default: 'arcade', 
+            arcade: { 
+                gravity: { y: 1800 },
+                roundPixels: true // 💡 물리 바운딩 박스 정수 변환 처리
+            } 
+        }, 
+        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, 
+        scene: [StartScene, SelectScene, VillageScene] 
+    };
+    new Phaser.Game(config);
+</script>
+</body>
+</html>
