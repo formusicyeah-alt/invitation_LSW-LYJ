@@ -326,27 +326,27 @@
             [1865, 970, 140, 10],
             [2350, 1053, 870, 10],
             [2398, 1002, 595, 10],
-            // 아래는 좁은 계단/발판 구간 (보이지 않는 히트박스. 통과 떨림 방지를 위해 두께를 10px로 확보)
-            [995, 690, 3, 10],
-            [1060, 660, 3, 10],
-            [1100, 610, 3, 10],
-            [1175, 580, 3, 10],
-            [1240, 565, 3, 10],
-            [1300, 535, 3, 10],
-            [1330, 475, 3, 10],
-            [1335, 420, 3, 10],
-            [1325, 365, 3, 10],
-            [1290, 315, 3, 10],
-            [1220, 285, 3, 10],
-            [1145, 300, 3, 10],
-            [1065, 305, 3, 10],
-            [990, 300, 3, 10],
-            [930, 340, 3, 10],
-            [915, 395, 3, 10],
-            [910, 445, 3, 10],
-            [940, 495, 3, 10],
-            [990, 540, 3, 10],
-            [1055, 575, 3, 10],
+            // 아래는 좁은 계단/발판 구간 (3x2 크기의 작은 발판들)
+            [995, 690, 3, 2],
+            [1060, 660, 3, 2],
+            [1100, 610, 3, 2],
+            [1175, 580, 3, 2],
+            [1240, 565, 3, 2],
+            [1300, 535, 3, 2],
+            [1330, 475, 3, 2],
+            [1335, 420, 3, 2],
+            [1325, 365, 3, 2],
+            [1290, 315, 3, 2],
+            [1220, 285, 3, 2],
+            [1145, 300, 3, 2],
+            [1065, 305, 3, 2],
+            [990, 300, 3, 2],
+            [930, 340, 3, 2],
+            [915, 395, 3, 2],
+            [910, 445, 3, 2],
+            [940, 495, 3, 2],
+            [990, 540, 3, 2],
+            [1055, 575, 3, 2],
             [1110, 530, 100, 20],
         ];
 
@@ -541,29 +541,10 @@
             this.cursors = this.input.keyboard.createCursorKeys();
             this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-            // 일부 브라우저는 전체화면 전환 직후 Phaser 키보드 캡처가 불안정해질 수 있어,
-            // 브라우저 네이티브 keydown/keyup도 같이 추적해서 둘 중 하나라도 눌리면 입력으로 인정한다.
-            this.nativeKeys = { down: false };
-            this._onNativeKeyDown = (e) => { if (e.code === 'ArrowDown') this.nativeKeys.down = true; };
-            this._onNativeKeyUp = (e) => { if (e.code === 'ArrowDown') this.nativeKeys.down = false; };
-            window.addEventListener('keydown', this._onNativeKeyDown);
-            window.addEventListener('keyup', this._onNativeKeyUp);
-            // 씬이 종료될 때 리스너가 중복으로 쌓이지 않도록 정리
-            this.events.once('shutdown', () => {
-                window.removeEventListener('keydown', this._onNativeKeyDown);
-                window.removeEventListener('keyup', this._onNativeKeyUp);
-            });
-
-            // 전체화면/씬 전환 직후 키보드 입력이 씹히는 것을 막기 위해 캔버스에 포커스를 강제로 줌
-            this.game.canvas.setAttribute('tabindex', '0');
-            this.game.canvas.focus();
-
             this.controls = { left: false, right: false, up: false, down: false };
             this.isJumping = false;
             this.isDownJumping = false; // 아래 점프(발판 통과) 진행 중 여부
             this.isTeleporting = false;
-            this.justJumped = false;    // 이번 프레임에 점프가 막 발생했는지 (착지 보정 로직과 충돌 방지용)
-            this.airborneFrames = 0;    // 연속으로 땅에 닿지 않은 프레임 수 (애니메이션 깜빡임 방지용)
 
             // 방향키 버튼 4개를 화살표 이미지 1장으로 회전시켜 생성
             VillageScene.DIRECTION_BUTTONS.forEach(btn => {
@@ -577,7 +558,7 @@
             const btnStyle = { font: '30px Arial', fill: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', padding: { x: 20, y: 20 } };
             this.add.text(1100, 600, '점프', btnStyle).setInteractive().setScrollFactor(0).setDepth(9999)
                 .on('pointerdown', () => {
-                    const downHeld = this.controls.down || this.cursors.down.isDown || this.nativeKeys.down;
+                    const downHeld = this.controls.down || this.cursors.down.isDown;
                     this.tryJump(downHeld, -400);
                 });
         }
@@ -621,7 +602,7 @@
         // jumpVelocity: 일반 점프 시 적용할 상승 속도 (버튼 -400 / 키보드 -550)
         // ---------------------------------------------------------------
         tryJump(downHeld, jumpVelocity) {
-            if (!this.player.body.blocked.down || this.isDownJumping) return false;
+            if (!this.player.body.blocked.down || this.isDownJumping) return;
 
             if (downHeld) {
                 this.performDownJump();
@@ -630,8 +611,6 @@
                 if (!this.isJumping) this.sound.play('bgm_jump');
                 this.isJumping = true;
             }
-            this.justJumped = true; // 같은 프레임에 착지 보정 속도가 점프 속도를 덮어쓰지 않도록 표시
-            return true;
         }
 
         // ---------------------------------------------------------------
@@ -665,8 +644,7 @@
             const moveLeft = this.controls.left || this.cursors.left.isDown;
             const moveRight = this.controls.right || this.cursors.right.isDown;
             const moveUp = this.controls.up || this.cursors.up.isDown;
-            // 터치/Phaser키보드/브라우저 네이티브 키 중 하나라도 눌려있으면 아래 입력으로 인정 (PC 입력 누락 방지용 이중 체크)
-            const moveDown = this.controls.down || this.cursors.down.isDown || this.nativeKeys.down;
+            const moveDown = this.controls.down || this.cursors.down.isDown;
             const jumpPressed = this.spaceKey.isDown;
 
             // 좌우 이동
@@ -678,19 +656,9 @@
                 this.player.setVelocityX(0);
             }
 
-            // 이번 프레임에 점프를 시도했는지 여부 (착지 보정 속도가 점프를 덮어쓰지 않도록)
-            this.justJumped = false;
-
             // 키보드 스페이스바 점프 (아래 방향키 동시 입력 시 아래 점프로 분기)
             if (jumpPressed) {
                 this.tryJump(moveDown, -550);
-            }
-
-            // 착지 안정화: 땅에 닿아있는데 막 점프하지 않았다면 아주 약한 하강 속도를 유지시켜
-            // (특히 모바일에서) 얇은 발판 위에서 미세하게 붕 떴다가 다시 붙는 현상으로 인한
-            // 점프/대기 애니메이션 깜빡임을 방지한다.
-            if (this.player.body.blocked.down && !this.justJumped && !this.isDownJumping) {
-                this.player.setVelocityY(20);
             }
 
             // 포탈/히든포탈 진입 체크 (방향키 위 + 포탈 근처일 때)
@@ -698,13 +666,8 @@
                 this.checkPortalEntry();
             }
 
-            // 공중 상태를 1프레임짜리 순간 판정이 아니라 "2프레임 이상 연속"으로 판단해서
-            // 물리 충돌 판정이 한 프레임 흔들리더라도 애니메이션이 깜빡이지 않게 한다.
-            this.airborneFrames = this.player.body.blocked.down ? 0 : this.airborneFrames + 1;
-            const isAirborne = this.airborneFrames >= 2;
-
             // 애니메이션 전환: 공중(점프) > 아래방향(엎드림) > 좌우이동(걷기) > 대기(숨쉬기)
-            if (isAirborne) {
+            if (!this.player.body.blocked.down) {
                 const anim = Math.abs(this.player.body.velocity.y) < 50 ? 'jump_peak' : 'jump_up';
                 this.player.anims.play(`${this.myChar}_${anim}`, true);
             } else if (moveDown) {
