@@ -4,21 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>이승원,이유진 결혼합니다.</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <script src="[cdn.jsdelivr.net](https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js)"></script>
     <style>
         body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background-color: #000; }
         #game-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; z-index: 1; }
         #portrait-warning { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #ffffff; color: #000000; display: none; justify-content: center; align-items: center; z-index: 9999; text-align: center; font-family: "Arial", sans-serif; }
         @media screen and (orientation: portrait) { #portrait-warning { display: flex; } }
-
-        /* 캔버스 확대 시 화질 저하 방지 */
         canvas {
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
             image-rendering: pixelated;
         }
-
-        /* 마우스 커서 이미지 전역 설정 (Phaser 기본 pointer 설정보다 우선 적용) */
         * {
             cursor: url('images/click_0.png'), auto !important;
         }
@@ -31,18 +27,14 @@
 <script>
     // =========================================================================
     // 📦 공용 헬퍼 함수
-    //  - 여러 장의 연속 번호 이미지를 한 번에 불러오거나, 같은 패턴의 애니메이션을
-    //    여러 캐릭터/NPC에 반복 생성할 때 쓰는 함수들입니다.
     // =========================================================================
 
-    // 연속된 번호가 붙은 이미지 시퀀스를 한 번에 로드 (예: spinel_0 ~ spinel_11)
     function loadSequence(scene, prefix, start, end) {
         for (let i = start; i <= end; i++) {
             scene.load.image(`${prefix}_${i}`, `images/${prefix}_${i}.png`);
         }
     }
 
-    // 연속된 번호 이미지로 애니메이션 1개를 등록
     function createAnim(scene, key, prefix, frameCount, frameRate = 6, repeat = -1) {
         scene.anims.create({
             key,
@@ -55,58 +47,38 @@
 
     // =========================================================================
     // 🎬 SCENE 1. StartScene
-    //  - 청첩장 인트로 영상(애니메이션)을 보여주고, 클릭하면 캐릭터 선택 화면으로 이동
     // =========================================================================
     class StartScene extends Phaser.Scene {
         constructor() { super({ key: 'StartScene' }); }
 
         preload() {
-            // 인트로 청첩장 애니메이션 (invit_0 ~ invit_20)
             loadSequence(this, 'invit', 0, 20);
-
-            // 캐릭터 선택 화면용 배경/UI 이미지
             this.load.image('bg_select', 'images/bg_select.png');
             this.load.image('sign', 'images/sign.png');
             this.load.image('title_sign', 'images/title_sign.png');
             this.load.image('title', 'images/title.png');
             this.load.image('sound_on', 'images/sound_on.png');
             this.load.image('sound_off', 'images/sound_off.png');
-
-            // BGM (캐릭터 선택 화면 배경음 + 캐릭터 선택 효과음)
             this.load.audio('bgm_select', 'audio/bgm_select.mp3');
             this.load.audio('bgm_ch_select', 'audio/bgm_ch_select.mp3');
-
-            // 웨딩빌리지 배경/배경음
             this.load.image('bg_wedding_village', 'images/bg_wedding_village.png');
             this.load.audio('bgm_wedding_village', 'audio/bgm_wedding_village.mp3');
-
-            // 플레이어 캐릭터(man/woman/toben) 공용 애니메이션 이미지
-            //  - stand1: 가만히 서있기(숨쉬기) 4프레임
-            //  - walk1 : 걷기 5프레임
-            //  - jump  : 점프 2프레임(상승/정점)
             ['man', 'woman', 'toben'].forEach(char => {
                 loadSequence(this, `${char}_stand1`, 0, 3);
                 loadSequence(this, `${char}_walk1`, 0, 4);
                 loadSequence(this, `${char}_jump`, 0, 1);
-                this.load.image(`${char}_prone`, `images/${char}_prone.png`); // 아래 점프 시 엎드린 모습 이미지
+                this.load.image(`${char}_prone`, `images/${char}_prone.png`);
             });
-
-            // 일반 포탈 / 히든 포탈 / 스포트라이트 이미지
             loadSequence(this, 'portal', 0, 7);
-            loadSequence(this, 'hiden_portal', 1, 5); // ※ 0번 없이 1~5번만 로드됨 (원본 그대로 유지, 아래 VillageScene 주석 참고)
+            loadSequence(this, 'hiden_portal', 1, 5);
             loadSequence(this, 'sprite', 0, 5);
-
-            // 효과음 (포탈 이동음 / 히든포탈 이동음 / 점프음)
             this.load.audio('bgm_portal', 'audio/bgm_portal.mp3');
             this.load.audio('bgm_tel', 'audio/bgm_tel.mp3');
             this.load.audio('bgm_jump', 'audio/bgm_jump.mp3');
-
-            // 방향키 버튼 이미지 (1장으로 4방향 모두 회전시켜 재사용)
             this.load.image('arrow_0', 'images/arrow_0.png');
         }
 
         create() {
-            // 청첩장 인트로 애니메이션 재생 → 클릭하면 전체화면 + 캐릭터 선택 화면으로 페이드 전환
             createAnim(this, 'invit_playing', 'invit', 21, 12);
 
             this.add.sprite(640, 360, 'invit_0')
@@ -127,8 +99,6 @@
 
     // =========================================================================
     // 🎬 SCENE 2. SelectScene
-    //  - 캐릭터(man/woman/toben) 선택 화면
-    //  - 캐릭터 클릭 시 강조 표시 + 효과음, 표지판 클릭 시 웨딩빌리지 입장
     // =========================================================================
     class SelectScene extends Phaser.Scene {
         constructor() { super({ key: 'SelectScene' }); }
@@ -139,19 +109,16 @@
             this.selectedChar = '';
             this.isSoundOn = false;
 
-            // --- 배경 / 타이틀 이미지 배치 ---
             this.add.image(640, 360, 'bg_select').setDisplaySize(1280, 720);
             this.add.image(125, 170, 'title_sign').setScale(0.25);
             this.add.image(660, 170, 'title').setScale(0.45);
 
-            // --- 장식용 포탈 애니메이션 + 스포트라이트(선택한 캐릭터 위에 비추는 빛) ---
             createAnim(this, 'portal_playing', 'portal', 8, 5);
             this.add.sprite(300, 500, 'portal_0').setOrigin(0.2, 1).setScale(1.5).play('portal_playing');
 
             createAnim(this, 'spotlight_playing', 'sprite', 6, 10);
             this.spotlight = this.add.sprite(-200, -200, 'sprite_0').setScale(2).play('spotlight_playing').setVisible(false);
 
-            // --- 사운드 ON/OFF 버튼 + 선택 화면 BGM ---
             let soundBtn = this.add.image(1200, 50, 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1);
             let bgm = this.cache.audio.exists('bgm_select')
                 ? this.sound.add('bgm_select', { loop: true, volume: 0.5 })
@@ -172,12 +139,10 @@
                 }
             });
 
-            // --- 캐릭터 선택 버튼 3종 (man / woman / toben) ---
-            // 캐릭터별 "서있기" / "걷기" 애니메이션을 한 번에 등록
             ['man', 'woman', 'toben'].forEach(char => {
                 this.anims.create({
                     key: `${char}_breathing`,
-                    frames: [0, 0, 1, 1, 2, 2, 3, 3].map(i => ({ key: `${char}_stand1_${i}` })), // 천천히 숨쉬는 느낌을 주기 위해 프레임을 2번씩 반복
+                    frames: [0, 0, 1, 1, 2, 2, 3, 3].map(i => ({ key: `${char}_stand1_${i}` })),
                     frameRate: 6,
                     repeat: -1
                 });
@@ -189,7 +154,6 @@
             let tobenBtn = this.add.sprite(950, 550, 'toben_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('toben_breathing');
             const charButtons = [manBtn, womanBtn, tobenBtn];
 
-            // 캐릭터 선택 시: 선택된 캐릭터만 밝게(걷기 애니메이션) + 나머지는 반투명(숨쉬기) + 스포트라이트 이동 + 선택 효과음
             const selectCharacter = (targetBtn, charName) => {
                 charButtons.forEach(b => {
                     b.setAlpha(0.5).play(`${b.texture.key.split('_')[0]}_breathing`);
@@ -198,7 +162,7 @@
                 this.selectedChar = charName;
                 this.spotlight.setVisible(true).setPosition(targetBtn.x, targetBtn.y - 250);
 
-                this.sound.stopByKey('bgm_ch_select'); // 효과음 중첩 방지(기존 재생 중인 것 강제 정지)
+                this.sound.stopByKey('bgm_ch_select');
                 this.sound.play('bgm_ch_select');
             };
 
@@ -206,11 +170,10 @@
             womanBtn.on('pointerdown', () => selectCharacter(womanBtn, 'woman'));
             tobenBtn.on('pointerdown', () => selectCharacter(tobenBtn, 'toben'));
 
-            // --- 표지판(웨딩빌리지 입장) ---
             this.add.image(1150, 305, 'sign').setScale(0.3).setInteractive().on('pointerdown', () => {
-                if (!this.selectedChar) return; // 캐릭터를 아직 선택하지 않았으면 무시
+                if (!this.selectedChar) return;
 
-                this.sound.play('bgm_portal'); // 입장 포탈 효과음
+                this.sound.play('bgm_portal');
 
                 this.cameras.main.fadeOut(1000, 0, 0, 0);
                 this.cameras.main.once('camerafadeoutcomplete', () => {
@@ -220,7 +183,6 @@
                     });
 
                     if (bgm && bgm.isPlaying) {
-                        // 선택 화면 BGM을 서서히 줄이면서 다음 씬으로 전환
                         this.tweens.add({
                             targets: bgm,
                             volume: 0,
@@ -238,8 +200,6 @@
 
     // =========================================================================
     // 🎬 SCENE 3. VillageScene
-    //  - 실제 플레이가 이루어지는 웨딩빌리지 맵
-    //  - 구성: NPC 배치, 말풍선 연출, 포탈/히든포탈, 발판(충돌 영역), 조작 UI, 플레이어 이동
     // =========================================================================
     class VillageScene extends Phaser.Scene {
         constructor() { super({ key: 'VillageScene' }); }
@@ -249,65 +209,49 @@
             this.isSoundOn = data.isSoundOn;
         }
 
-        // -------------------------------------------------------------------
-        // ⚙️ 맵 설정값 (좌표/크기 등을 여기서 한 번에 관리)
-        //  - 발판 위치를 바꾸거나, NPC 위치를 옮기고 싶을 때 이 부분만 수정하면 됩니다.
-        // -------------------------------------------------------------------
-
-        // 고정 NPC(앉아있는 혼주) 목록: [텍스처, x, y]
         static FIXED_NPCS = [
-            { key: 'bride_fa_sit', x: 1180, y: 755 }, // 신부 아버지
-            { key: 'bride_mo_sit', x: 1100, y: 755 }, // 신부 어머니
-            { key: 'groom_fa_sit', x: 410, y: 645 },  // 신랑 아버지
-            { key: 'groom_mo_sit', x: 490, y: 645 },  // 신랑 어머니
+            { key: 'bride_fa_sit', x: 1180, y: 755 },
+            { key: 'bride_mo_sit', x: 1100, y: 755 },
+            { key: 'groom_fa_sit', x: 410, y: 645 },
+            { key: 'groom_mo_sit', x: 490, y: 645 },
         ];
 
-        // 움직이는(애니메이션 있는) NPC 목록
-        // prefix: 이미지 파일 접두어, frames: 프레임 수, flipX: 좌우 반전 여부, origin: 기준점
         static MOVING_NPCS = [
-            { name: 'GM',     prefix: 'GM',            frames: 10, x: 290,  y: 1085, origin: [0.5, 1] }, // 운영자
-            { name: 'spinel', prefix: 'spinel',        frames: 12, x: 1450, y: 1085, origin: [0.5, 1] }, // 스피넬 (맵/오시는 길 안내)
-            { name: 'warena', prefix: 'warena',        frames: 8,  x: 650,  y: 1085, origin: [0.5, 1] }, // 워레나 (축의 정보)
-            { name: 'groom',  prefix: 'groom_stand1',  frames: 4,  x: 1075, y: 490,  origin: [0.5, 1] }, // 신랑
-            { name: 'bride',  prefix: 'bride_stand1',  frames: 4,  x: 1160, y: 490,  origin: [0.5, 1] }, // 신부
-            { name: 'camera', prefix: 'camera',        frames: 4,  x: 850,  y: 1085, origin: [0, 1], flipX: true }, // 카메라 안내
-            { name: 'letter', prefix: 'letter',        frames: 6,  x: 2100, y: 780,  origin: [0.5, 1], flipX: true }, // 편지 안내
+            { name: 'GM',     prefix: 'GM',            frames: 10, x: 290,  y: 1085, origin: [0.5, 1] },
+            { name: 'spinel', prefix: 'spinel',        frames: 12, x: 1450, y: 1085, origin: [0.5, 1] },
+            { name: 'warena', prefix: 'warena',        frames: 8,  x: 650,  y: 1085, origin: [0.5, 1] },
+            { name: 'groom',  prefix: 'groom_stand1',  frames: 4,  x: 1075, y: 490,  origin: [0.5, 1] },
+            { name: 'bride',  prefix: 'bride_stand1',  frames: 4,  x: 1160, y: 490,  origin: [0.5, 1] },
+            { name: 'camera', prefix: 'camera',        frames: 4,  x: 850,  y: 1085, origin: [0, 1], flipX: true },
+            { name: 'letter', prefix: 'letter',        frames: 6,  x: 2100, y: 780,  origin: [0.5, 1], flipX: true },
         ];
 
-        // 말풍선 1개짜리(단독) NPC: 4초 주기로 2초간 노출
-        //  offset: 말풍선 위치를 NPC 기준 (dx, dy)만큼 보정
         static SPEECH_SINGLE = [
             { npc: 'spinel',   key: 'text_spinel',   dx: -20, dy: -115 },
             { npc: 'warena',   key: 'text_warena',   dx: 20,  dy: -115 },
             { npc: 'camera',   key: 'text_camera',   dx: 60,  dy: -123 },
             { npc: 'letter',   key: 'text_letter',   dx: 20,  dy: -115 },
         ];
-        // 고정 NPC(혼주)도 같은 패턴을 쓰지만 별도 목록(고정 NPC 객체를 따로 참조하기 위함)
         static SPEECH_SINGLE_FIXED = [
             { npc: 'bride_fa_sit', key: 'text_bride_pa', dx: -50, dy: -100 },
             { npc: 'groom_fa_sit', key: 'text_groom_pa', dx: 50,  dy: -100 },
         ];
 
-        // 말풍선 2개 릴레이(대화하듯 순서대로) NPC: 7.5초 주기로 [말풍선1 2초] → [0.5초 공백] → [말풍선2 2초]
         static SPEECH_RELAY = [
             { npc: 'bride', key1: 'text_bride_1', key2: 'text_bride_2', dx: 20,  dy: -115 },
             { npc: 'groom', key1: 'text_groom_1', key2: 'text_groom_2', dx: -20, dy: -115 },
             { npc: 'GM',    key1: 'text_GM_1',    key2: 'text_GM_2',    dx: 20,  dy: -115 },
         ];
 
-        // 일반 포탈(SelectScene으로 복귀) 위치
         static MAIN_PORTAL = { x: 120, y: 418 };
 
-        // 히든 포탈: A↔B 형태로 서로 연결되는 짝 목록
         static HIDDEN_PORTAL_PAIRS = [
             { a: { x: 645, y: 655, scale: 1.5 },  b: { x: 175, y: 1095, scale: 1.5 } },
             { a: { x: 1270, y: 750, scale: 1.3 }, b: { x: 1815, y: 1095, scale: 1.3 } },
         ];
 
-        // 발판(충돌 영역) 목록: [x, y, width, height]
-        // 시각적으로는 보이지 않는 투명 사각형이며, 캐릭터가 밟고 서는 바닥/계단 역할을 합니다.
         static GROUNDS = [
-            [3016 / 2, 1245 - 115, 3016, 20], // 맵 전체 바닥
+            [3016 / 2, 1245 - 115, 3016, 20],
             [200, 450, 550, 20],
             [235, 540, 60, 20],
             [235, 650, 60, 20],
@@ -326,7 +270,6 @@
             [1865, 970, 140, 10],
             [2350, 1053, 870, 10],
             [2398, 1002, 595, 10],
-            // 아래는 좁은 계단/발판 구간 (보이지 않는 히트박스. 통과 떨림 방지를 위해 두께를 10px로 확보)
             [995, 690, 3, 10],
             [1060, 660, 3, 10],
             [1100, 610, 3, 10],
@@ -350,10 +293,8 @@
             [1110, 530, 100, 20],
         ];
 
-        // 점프 시 적용할 상승 속도 (입력 수단별로 다르게 유지)
         static JUMP_VELOCITY = { keyboard: -550, touch: -400 };
 
-        // 방향키 버튼: [컨트롤명, x, y, 각도]  ※ 1장의 화살표 이미지를 회전시켜 4방향으로 재사용
         static DIRECTION_BUTTONS = [
             { control: 'left',  x: 95,  y: 631, angle: 270 },
             { control: 'right', x: 260, y: 635, angle: 90 },
@@ -363,13 +304,8 @@
 
 
         preload() {
-            // 고정 NPC(혼주) 이미지
             VillageScene.FIXED_NPCS.forEach(npc => this.load.image(npc.key, `images/${npc.key}.png`));
-
-            // 움직이는 NPC 이미지 시퀀스
             VillageScene.MOVING_NPCS.forEach(npc => loadSequence(this, npc.prefix, 0, npc.frames - 1));
-
-            // 말풍선 이미지 (단독형 + 혼주 단독형 + 릴레이형)
             VillageScene.SPEECH_SINGLE.forEach(s => this.load.image(s.key, `images/${s.key}.png`));
             VillageScene.SPEECH_SINGLE_FIXED.forEach(s => this.load.image(s.key, `images/${s.key}.png`));
             VillageScene.SPEECH_RELAY.forEach(s => {
@@ -381,17 +317,12 @@
         create() {
             this.cameras.main.fadeIn(1000, 0, 0, 0);
 
-            // --- 배경 ---
             this.add.image(0, 0, 'bg_wedding_village').setOrigin(0, 0).setScale(0.5);
 
-            // --- NPC 배치 ---
-            const npcRefs = this.createNpcs();      // { 이름: 스프라이트/이미지 객체 } 형태로 반환
-            this.createSpeechBubbles(npcRefs);        // 말풍선 생성 + 타이머 등록
-
-            // --- 포탈 / 히든 포탈 ---
+            const npcRefs = this.createNpcs();
+            this.createSpeechBubbles(npcRefs);
             this.createPortals();
 
-            // --- 월드/카메라 경계 및 플레이어 ---
             this.physics.world.setBounds(0, 0, 3016, 1245);
             this.cameras.main.setBounds(0, 0, 3016, 1245);
 
@@ -399,18 +330,16 @@
                 .setScale(1.5).setOrigin(0.5, 1).setCollideWorldBounds(true).setBounce(0).setDepth(10);
             this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
-            // 플레이어 점프 애니메이션(상승/정점 각 1프레임)
             this.anims.create({ key: `${this.myChar}_jump_up`, frames: [{ key: `${this.myChar}_jump_0` }], frameRate: 1 });
             this.anims.create({ key: `${this.myChar}_jump_peak`, frames: [{ key: `${this.myChar}_jump_1` }], frameRate: 1 });
 
-            // --- 발판(충돌 영역) 생성 ---
             this.createGrounds();
-
-            // --- 조작 UI (방향키 / 점프 / 사운드) ---
             this.setupControls();
             this.setupSoundButton();
 
-            // --- 디버그용 실시간 마우스 좌표 표시 ---
+            // 코요테 타임용 타임스탬프 초기화
+            this.lastGroundedTime = 0;
+
             this.coordText = this.add.text(0, 0, '(0, 0)', {
                 font: '20px Arial',
                 fill: '#ffff00',
@@ -419,10 +348,6 @@
             }).setDepth(9999);
         }
 
-        // ---------------------------------------------------------------
-        // NPC 생성: FIXED_NPCS(고정) + MOVING_NPCS(애니메이션) 를 한 번에 배치
-        // 반환값: { npc이름: 게임오브젝트 } 맵 (말풍선 위치 계산에 사용)
-        // ---------------------------------------------------------------
         createNpcs() {
             const refs = {};
 
@@ -445,11 +370,6 @@
             return refs;
         }
 
-        // ---------------------------------------------------------------
-        // 말풍선 생성 + 등장 타이머 등록
-        //  - 단독형: 0~3초 사이 랜덤 시작 → 이후 4초 주기로 2초씩 노출
-        //  - 릴레이형: 0~3초 사이 랜덤 시작 → 이후 7.5초 주기로 [1번 2초]→[0.5초 공백]→[2번 2초]
-        // ---------------------------------------------------------------
         createSpeechBubbles(npcRefs) {
             const makeBubble = (npc, key, dx, dy) => this.add.image(npc.x + dx, npc.y + dy, key)
                 .setOrigin(0.5, 1).setDepth(12).setVisible(false);
@@ -461,12 +381,10 @@
                 b2: makeBubble(npcRefs[s.npc], s.key2, s.dx, s.dy),
             }));
 
-            // 모든 말풍선 텍스처를 NEAREST 필터로 고정 (흐림 현상 방지)
             [...singleBubbles, ...relayBubbles.flatMap(r => [r.b1, r.b2])].forEach(bubble => {
                 if (bubble && bubble.texture) bubble.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
             });
 
-            // 단독형 말풍선 타이머
             singleBubbles.forEach(bubble => {
                 this.time.delayedCall(Phaser.Math.Between(0, 3000), () => {
                     const show = () => {
@@ -478,7 +396,6 @@
                 });
             });
 
-            // 릴레이형 말풍선 타이머
             relayBubbles.forEach(({ b1, b2 }) => {
                 this.time.delayedCall(Phaser.Math.Between(0, 3000), () => {
                     const showRelay = () => {
@@ -497,13 +414,6 @@
             });
         }
 
-        // ---------------------------------------------------------------
-        // 포탈(메인) + 히든 포탈 생성
-        //  ※ 원본 코드의 hiden_portal_0 텍스처는 preload에서 로드되지 않은 상태로
-        //     애니메이션에 사용되고 있었습니다(1~5만 로드, 0~4 애니메이션 재생).
-        //     동작 자체는 원본과 동일하게 유지했으니, 이미지가 깨져 보인다면
-        //     hiden_portal_0.png 파일을 추가하거나 로드 범위를 0~4로 바꿔주세요.
-        // ---------------------------------------------------------------
         createPortals() {
             this.add.sprite(VillageScene.MAIN_PORTAL.x, VillageScene.MAIN_PORTAL.y, 'portal_0')
                 .setOrigin(0.5, 1).setScale(1.5).play('portal_playing');
@@ -518,43 +428,44 @@
         }
 
         // ---------------------------------------------------------------
-        // 발판(보이지 않는 충돌 영역) 생성 + 플레이어와 충돌 등록
+        // 발판 생성
+        //  ※ [수정] mainFloorGround는 충돌 콜백으로 isOnMainFloor 플래그를 세움
+        //     → performDownJump에서 overlap() 대신 이 플래그를 사용
         // ---------------------------------------------------------------
         createGrounds() {
             this.groundObjects = [];
-            VillageScene.GROUNDS.forEach(([x, y, w, h]) => {
+            this.isOnMainFloor = false; // 맨 아래 바닥 위에 있는지 여부 (충돌 콜백으로 매 프레임 갱신)
+
+            VillageScene.GROUNDS.forEach(([x, y, w, h], index) => {
                 const ground = this.add.rectangle(x, y, w, h, 0x00ff00, 0);
                 this.physics.add.existing(ground, true);
                 ground.body.checkCollision.down = false;
                 ground.body.checkCollision.left = false;
                 ground.body.checkCollision.right = false;
-                this.physics.add.collider(this.player, ground);
+
+                if (index === 0) {
+                    // 맨 아래 바닥: 충돌 콜백으로 플래그 세팅
+                    this.physics.add.collider(this.player, ground, () => {
+                        this.isOnMainFloor = true;
+                    });
+                } else {
+                    this.physics.add.collider(this.player, ground);
+                }
+
                 this.groundObjects.push(ground);
             });
 
-            // 맨 아래 바닥(맵 전체를 받치는 발판, GROUNDS의 0번)은 아래점프로 통과할 수 없도록 별도 보관
             this.mainFloorGround = this.groundObjects[0];
             this.dropThroughGrounds = this.groundObjects.slice(1);
         }
 
         // ---------------------------------------------------------------
-        // 조작 UI: 방향키 4개 + 점프 버튼 + 키보드 입력 세팅
+        // 조작 UI 세팅
         // ---------------------------------------------------------------
-        // =================================================================
-        // 🎮 캐릭터 조작 관련 기능 모음
-        //  - 입력 수집(읱력 소스: 키보드+터치 통합) → 좌우이동 → 점프/아래점프
-        //    → 포탈 진입 체크 → 애니메이션 결정, 순서로 매 프레임 처리한다.
-        //  - 이전에 넣었던 "착지 보정(stick) 속도" 트릭은 오히려 충돌판정을
-        //    더 불안정하게 만들어서 제거했다. (PC 깜빡임 + 입력 꼬임의 원인)
-        // =================================================================
-
         setupControls() {
             this.cursors = this.input.keyboard.createCursorKeys();
             this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-            // 일부 브라우저는 전체화면 전환 직후 Phaser 키보드 캡처가 불안정해질 수 있어,
-            // 브라우저 네이티브 keydown/keyup의 ArrowDown도 보조로 같이 추적한다.
-            // (참고용 보조 입력일 뿐, 이동/점프 로직 자체에는 영향을 주지 않는다)
             this.nativeDownKeyHeld = false;
             this._onNativeKeyDown = (e) => { if (e.code === 'ArrowDown') this.nativeDownKeyHeld = true; };
             this._onNativeKeyUp = (e) => { if (e.code === 'ArrowDown') this.nativeDownKeyHeld = false; };
@@ -565,37 +476,27 @@
                 window.removeEventListener('keyup', this._onNativeKeyUp);
             });
 
-            // 전체화면/씬 전환 직후 키보드 입력이 씹히는 것을 막기 위해 캔버스에 포커스를 줌
             this.game.canvas.setAttribute('tabindex', '0');
             this.game.canvas.focus();
 
-            // 터치 버튼 눌림 상태 (방향키 4개)
             this.touchControls = { left: false, right: false, up: false, down: false };
-            this.isJumping = false;       // 일반 점프 효과음이 한 번만 나도록 체크하는 플래그
-            this.isDownJumping = false;   // 아래 점프(발판 통과)가 진행 중인지
+            this.isJumping = false;
+            this.isDownJumping = false;
             this.isTeleporting = false;
-            this.airborneFrames = 0;      // 연속으로 땅에 닿지 않은 프레임 수 (애니메이션 깜빡임 방지용. 물리에는 영향 없음)
 
-            // 방향키 버튼 4개를 화살표 이미지 1장으로 회전시켜 생성
             VillageScene.DIRECTION_BUTTONS.forEach(btn => {
                 this.add.image(btn.x, btn.y, 'arrow_0')
                     .setAngle(btn.angle).setScale(1.75).setInteractive().setScrollFactor(0).setDepth(9999)
                     .on('pointerdown', () => this.touchControls[btn.control] = true)
                     .on('pointerup', () => this.touchControls[btn.control] = false)
-                    .on('pointerout', () => this.touchControls[btn.control] = false); // 손가락이 버튼 밖으로 벗어나도 눌림 해제
+                    .on('pointerout', () => this.touchControls[btn.control] = false);
             });
 
-            // 점프 버튼 (터치) - 누른 시점의 입력 상태를 그대로 읽어 일반/아래 점프를 판단
             const btnStyle = { font: '30px Arial', fill: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', padding: { x: 20, y: 20 } };
             this.add.text(1100, 600, '점프', btnStyle).setInteractive().setScrollFactor(0).setDepth(9999)
                 .on('pointerdown', () => this.tryJump(this.readInput().down, VillageScene.JUMP_VELOCITY.touch));
         }
 
-        // ---------------------------------------------------------------
-        // 현재 프레임의 입력 상태를 한 곳에서 모아 반환 (키보드 + 터치 통합)
-        //  - update()와 점프 버튼 핸들러가 항상 이 함수를 통해서만 입력을 읽도록
-        //    통일해서, 입력 소스가 여러 곳에 흩어져 꼬이는 문제를 방지한다.
-        // ---------------------------------------------------------------
         readInput() {
             return {
                 left: this.touchControls.left || this.cursors.left.isDown,
@@ -606,9 +507,6 @@
             };
         }
 
-        // ---------------------------------------------------------------
-        // 사운드 ON/OFF 버튼 + 웨딩빌리지 BGM 재생/일시정지 처리
-        // ---------------------------------------------------------------
         setupSoundButton() {
             let bgm = null;
             if (this.cache.audio.exists('bgm_wedding_village')) {
@@ -640,17 +538,14 @@
         }
 
         // ---------------------------------------------------------------
-        // 점프 시도: 발판 위에 있을 때만 동작. 아래 방향키를 누르고 있으면
-        // 일반 점프 대신 아래 점프(발판 통과)를 실행한다.
-        // jumpVelocity: 일반 점프 시 적용할 상승 속도 (버튼 -400 / 키보드 -550)
-        // ---------------------------------------------------------------
-        // ---------------------------------------------------------------
-        // 점프 시도: 발판 위에 있을 때만 동작. 아래 방향키를 누르고 있으면
-        // 일반 점프 대신 아래 점프(발판 통과)를 실행한다.
-        // jumpVelocity: 일반 점프 시 적용할 상승 속도
+        // 점프 시도
+        //  ※ [수정] 코요테 타임 기준으로 착지 여부를 판단
+        //     → body.blocked.down 한두 프레임 흔들림에도 점프 입력이 씹히지 않음
         // ---------------------------------------------------------------
         tryJump(downHeld, jumpVelocity) {
-            if (!this.player.body.blocked.down || this.isDownJumping) return false;
+            const COYOTE_MS = 80;
+            const canJump = (this.time.now - this.lastGroundedTime) <= COYOTE_MS && !this.isDownJumping;
+            if (!canJump) return false;
 
             if (downHeld) {
                 this.performDownJump();
@@ -663,15 +558,15 @@
         }
 
         // ---------------------------------------------------------------
-        // 아래 점프: 현재 밟고 있는 발판이 맨 아래 바닥(mainFloorGround)이면
-        // 무시하고, 그 외 발판이면 잠시 위쪽 충돌을 꺼서 아래로 통과시킨다.
+        // 아래 점프
+        //  ※ [수정] overlap() 대신 isOnMainFloor 플래그로 맨 아래 바닥 여부 판단
         // ---------------------------------------------------------------
         performDownJump() {
-            if (this.physics.overlap(this.player, this.mainFloorGround)) return; // 맨 아래 바닥에서는 아래 점프 불가
+            if (this.isOnMainFloor) return; // 맨 아래 바닥에서는 아래 점프 불가
 
             this.isDownJumping = true;
             this.dropThroughGrounds.forEach(g => g.body.checkCollision.up = false);
-            this.player.setVelocityY(150); // 발판을 확실히 통과하도록 아래로 살짝 밀어줌
+            this.player.setVelocityY(150);
 
             this.time.delayedCall(300, () => {
                 this.dropThroughGrounds.forEach(g => g.body.checkCollision.up = true);
@@ -680,22 +575,27 @@
         }
 
         // ---------------------------------------------------------------
-        // 매 프레임 갱신: 좌표 표시, 좌우 이동, 점프, 포탈 진입 체크, 애니메이션 전환
-        // ---------------------------------------------------------------
-        // ---------------------------------------------------------------
         // 매 프레임 갱신
-        //  순서: ① 입력 읽기 → ② 좌우 이동 → ③ 점프(스페이스바) → ④ 포탈 진입
-        //        → ⑤ 공중 여부 판정 → ⑥ 애니메이션 결정
+        //  ※ [수정] airborneFrames 제거 → 코요테 타임(ms) 방식으로 교체
+        //     - lastGroundedTime: 마지막으로 바닥에 닿은 시각(ms)
+        //     - isOnMainFloor: 충돌 콜백에서 세팅되므로 매 프레임 시작 시 초기화
         // ---------------------------------------------------------------
         update() {
-            // 디버그용 마우스 좌표 표시
             const pointer = this.input.activePointer;
             this.coordText.setPosition(pointer.worldX + 15, pointer.worldY + 15);
             this.coordText.setText(`(${Math.round(pointer.worldX)}, ${Math.round(pointer.worldY)})`);
 
-            if (this.player.body.blocked.down) this.isJumping = false;
+            // isOnMainFloor는 충돌 콜백이 이번 프레임에 호출될 때만 true가 되도록
+            // 매 프레임 시작 시 초기화 후, 콜백이 다시 세팅하는 방식
+            this.isOnMainFloor = false;
 
-            // ① 입력 읽기 (키보드+터치 통합, 한 곳에서만 계산)
+            // 코요테 타임: 바닥에 닿아 있는 동안 타임스탬프를 갱신
+            if (this.player.body.blocked.down) {
+                this.lastGroundedTime = this.time.now;
+                this.isJumping = false;
+            }
+
+            // ① 입력 읽기
             const input = this.readInput();
 
             // ② 좌우 이동
@@ -707,23 +607,22 @@
                 this.player.setVelocityX(0);
             }
 
-            // ③ 점프 (스페이스바). 아래 방향키와 동시에 누르면 tryJump 내부에서 아래 점프로 분기됨
+            // ③ 점프 (스페이스바)
             if (input.jump) {
                 this.tryJump(input.down, VillageScene.JUMP_VELOCITY.keyboard);
             }
 
-            // ④ 포탈/히든포탈 진입 체크 (방향키 위 + 포탈 근처일 때)
+            // ④ 포탈 진입 체크
             if (input.up && !this.isTeleporting) {
                 this.checkPortalEntry();
             }
 
-            // ⑤ 공중 여부 판정: 1프레임짜리 순간 판정 대신 "2프레임 이상 연속"으로 판단해서
-            //    물리 충돌 판정이 한 프레임 흔들려도 애니메이션이 깜빡이지 않게 한다.
-            //    (이동/점프에는 영향을 주지 않는, 애니메이션 표시 전용 보정)
-            this.airborneFrames = this.player.body.blocked.down ? 0 : this.airborneFrames + 1;
-            const isAirborne = this.airborneFrames >= 2;
+            // ⑤ 공중 여부 판정 (코요테 타임 기준)
+            //    COYOTE_MS 이내라면 아직 "땅 위"로 취급해 애니메이션도 안정적으로 유지
+            const COYOTE_MS = 80;
+            const isAirborne = (this.time.now - this.lastGroundedTime) > COYOTE_MS;
 
-            // ⑥ 애니메이션 결정: 공중(점프) > 아래방향(엎드림) > 좌우이동(걷기) > 대기(숨쉬기)
+            // ⑥ 애니메이션 결정
             if (isAirborne) {
                 const anim = Math.abs(this.player.body.velocity.y) < 50 ? 'jump_peak' : 'jump_up';
                 this.player.anims.play(`${this.myChar}_${anim}`, true);
@@ -737,14 +636,10 @@
             }
         }
 
-        // ---------------------------------------------------------------
-        // 메인 포탈(맵 나가기) 또는 히든 포탈(짝 이동) 근처인지 확인 후 처리
-        // ---------------------------------------------------------------
         checkPortalEntry() {
             const dist = (x, y) => Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y);
             const PORTAL_RANGE = 50;
 
-            // 메인 포탈: 캐릭터 선택 화면으로 복귀
             if (dist(VillageScene.MAIN_PORTAL.x, VillageScene.MAIN_PORTAL.y) < PORTAL_RANGE) {
                 this.isTeleporting = true;
                 this.sound.play('bgm_portal');
@@ -756,14 +651,12 @@
                 return;
             }
 
-            // 히든 포탈: A 근처면 B로, B 근처면 A로 즉시 이동
             for (const pair of VillageScene.HIDDEN_PORTAL_PAIRS) {
                 if (dist(pair.a.x, pair.a.y) < PORTAL_RANGE) return this.executeTeleport(pair.b.x, pair.b.y);
                 if (dist(pair.b.x, pair.b.y) < PORTAL_RANGE) return this.executeTeleport(pair.a.x, pair.a.y);
             }
         }
 
-        // 히든 포탈 순간이동 처리 (효과음 + 위치 이동 + 0.3초 후 재이동 가능)
         executeTeleport(targetX, targetY) {
             this.isTeleporting = true;
             this.sound.play('bgm_tel');
@@ -783,17 +676,17 @@
         parent: 'game-container',
         render: {
             pixelArt: true,
-            roundPixels: true // 카메라/오브젝트 소수점 좌표 연산 방지 (흐림 현상 제거)
+            roundPixels: true
         },
         physics: {
             default: 'arcade',
             arcade: {
                 gravity: { y: 1200 },
-                roundPixels: true // 물리 바운딩 박스 정수 변환 처리
+                roundPixels: true
             }
         },
         input: {
-            activePointers: 3 // 모바일 동시 터치(방향키+점프 등) 인식을 위해 다중 포인터 추적 활성화
+            activePointers: 3
         },
         scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
         scene: [StartScene, SelectScene, VillageScene]
