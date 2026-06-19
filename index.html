@@ -81,11 +81,14 @@
             this.load.audio('bgm_wedding_village', 'audio/bgm_wedding_village.mp3');
 
             // 플레이어 캐릭터(man/woman/toben) 공용 애니메이션 이미지
-            //  - stand1: 가만히 서있기(숨쉬기) 4프레임 / walk1 : 걷기 5프레임 / jump  : 점프 2프레임(상승/정점)
+            //  - stand1: 가만히 서있기(숨쉬기) 4프레임
+            //  - walk1 : 걷기 5프레임
+            //  - jump  : 점프 2프레임(상승/정점)
             ['man', 'woman', 'toben'].forEach(char => {
                 loadSequence(this, `${char}_stand1`, 0, 3);
                 loadSequence(this, `${char}_walk1`, 0, 4);
                 loadSequence(this, `${char}_jump`, 0, 1);
+                this.load.image(`${char}_prone`, `images/${char}_prone.png`); // 아래 점프 시 엎드린 모습 이미지
             });
 
             // 일반 포탈 / 히든 포탈 / 스포트라이트 이미지
@@ -120,6 +123,7 @@
                 });
         }
     }
+
 
     // =========================================================================
     // 🎬 SCENE 2. SelectScene
@@ -301,13 +305,49 @@
         ];
 
         // 발판(충돌 영역) 목록: [x, y, width, height]
+        // 시각적으로는 보이지 않는 투명 사각형이며, 캐릭터가 밟고 서는 바닥/계단 역할을 합니다.
         static GROUNDS = [
             [3016 / 2, 1245 - 115, 3016, 20], // 맵 전체 바닥
-            [200, 450, 550, 20], [235, 540, 60, 20], [235, 650, 60, 20], [50, 490, 65, 20], [50, 600, 65, 20], [530, 685, 390, 20], [860, 740, 100, 20], [1150, 800, 350, 20], [1400, 820, 5, 10], [1470, 875, 5, 10], 
-            [2063, 925, 1000, 20], [1950, 880, 650, 20], [1980, 825, 600, 20], [1777.5, 1080, 140, 10], [1822.5, 1025, 140, 10], [1865, 970, 140, 10], [2350, 1053, 870, 10], [2398, 1002, 595, 10], 
+            [200, 450, 550, 20],
+            [235, 540, 60, 20],
+            [235, 650, 60, 20],
+            [50, 490, 65, 20],
+            [50, 600, 65, 20],
+            [530, 685, 390, 20],
+            [860, 740, 100, 20],
+            [1150, 800, 350, 20],
+            [1400, 820, 5, 10],
+            [1470, 875, 5, 10],
+            [2063, 925, 1000, 20],
+            [1950, 880, 650, 20],
+            [1980, 825, 600, 20],
+            [1777.5, 1080, 140, 10],
+            [1822.5, 1025, 140, 10],
+            [1865, 970, 140, 10],
+            [2350, 1053, 870, 10],
+            [2398, 1002, 595, 10],
             // 아래는 좁은 계단/발판 구간 (3x2 크기의 작은 발판들)
-            [995, 690, 3, 2], [1060, 660, 3, 2], [1100, 610, 3, 2], [1175, 580, 3, 2], [1240, 565, 3, 2], [1300, 535, 3, 2], [1330, 475, 3, 2], [1335, 420, 3, 2], [1325, 365, 3, 2], [1290, 315, 3, 2],
-            [1220, 285, 3, 2], [1145, 300, 3, 2], [1065, 305, 3, 2], [990, 300, 3, 2], [930, 340, 3, 2], [915, 395, 3, 2], [910, 445, 3, 2], [940, 495, 3, 2], [990, 540, 3, 2], [1055, 575, 3, 2], [1110, 530, 100, 20],
+            [995, 690, 3, 2],
+            [1060, 660, 3, 2],
+            [1100, 610, 3, 2],
+            [1175, 580, 3, 2],
+            [1240, 565, 3, 2],
+            [1300, 535, 3, 2],
+            [1330, 475, 3, 2],
+            [1335, 420, 3, 2],
+            [1325, 365, 3, 2],
+            [1290, 315, 3, 2],
+            [1220, 285, 3, 2],
+            [1145, 300, 3, 2],
+            [1065, 305, 3, 2],
+            [990, 300, 3, 2],
+            [930, 340, 3, 2],
+            [915, 395, 3, 2],
+            [910, 445, 3, 2],
+            [940, 495, 3, 2],
+            [990, 540, 3, 2],
+            [1055, 575, 3, 2],
+            [1110, 530, 100, 20],
         ];
 
         // 방향키 버튼: [컨트롤명, x, y, 각도]  ※ 1장의 화살표 이미지를 회전시켜 4방향으로 재사용
@@ -317,6 +357,7 @@
             { control: 'up',    x: 179, y: 550, angle: 0 },
             { control: 'down',  x: 175, y: 635, angle: 180 },
         ];
+
 
         preload() {
             // 고정 NPC(혼주) 이미지
@@ -477,6 +518,7 @@
         // 발판(보이지 않는 충돌 영역) 생성 + 플레이어와 충돌 등록
         // ---------------------------------------------------------------
         createGrounds() {
+            this.groundObjects = [];
             VillageScene.GROUNDS.forEach(([x, y, w, h]) => {
                 const ground = this.add.rectangle(x, y, w, h, 0x00ff00, 0);
                 this.physics.add.existing(ground, true);
@@ -484,7 +526,12 @@
                 ground.body.checkCollision.left = false;
                 ground.body.checkCollision.right = false;
                 this.physics.add.collider(this.player, ground);
+                this.groundObjects.push(ground);
             });
+
+            // 맨 아래 바닥(맵 전체를 받치는 발판, GROUNDS의 0번)은 아래점프로 통과할 수 없도록 별도 보관
+            this.mainFloorGround = this.groundObjects[0];
+            this.dropThroughGrounds = this.groundObjects.slice(1);
         }
 
         // ---------------------------------------------------------------
@@ -496,6 +543,7 @@
 
             this.controls = { left: false, right: false, up: false, down: false };
             this.isJumping = false;
+            this.isDownJumping = false; // 아래 점프(발판 통과) 진행 중 여부
             this.isTeleporting = false;
 
             // 방향키 버튼 4개를 화살표 이미지 1장으로 회전시켜 생성
@@ -506,15 +554,12 @@
                     .on('pointerup', () => this.controls[btn.control] = false);
             });
 
-            // 점프 버튼
+            // 점프 버튼 (아래 방향키를 같이 누르고 있으면 아래 점프로 분기)
             const btnStyle = { font: '30px Arial', fill: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', padding: { x: 20, y: 20 } };
             this.add.text(1100, 600, '점프', btnStyle).setInteractive().setScrollFactor(0).setDepth(9999)
                 .on('pointerdown', () => {
-                    if (this.player.body.blocked.down) {
-                        this.player.setVelocityY(-400);
-                        if (!this.isJumping) this.sound.play('bgm_jump');
-                        this.isJumping = true;
-                    }
+                    const downHeld = this.controls.down || this.cursors.down.isDown;
+                    this.tryJump(downHeld, -400);
                 });
         }
 
@@ -552,6 +597,40 @@
         }
 
         // ---------------------------------------------------------------
+        // 점프 시도: 발판 위에 있을 때만 동작. 아래 방향키를 누르고 있으면
+        // 일반 점프 대신 아래 점프(발판 통과)를 실행한다.
+        // jumpVelocity: 일반 점프 시 적용할 상승 속도 (버튼 -400 / 키보드 -550)
+        // ---------------------------------------------------------------
+        tryJump(downHeld, jumpVelocity) {
+            if (!this.player.body.blocked.down || this.isDownJumping) return;
+
+            if (downHeld) {
+                this.performDownJump();
+            } else {
+                this.player.setVelocityY(jumpVelocity);
+                if (!this.isJumping) this.sound.play('bgm_jump');
+                this.isJumping = true;
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // 아래 점프: 현재 밟고 있는 발판이 맨 아래 바닥(mainFloorGround)이면
+        // 무시하고, 그 외 발판이면 잠시 위쪽 충돌을 꺼서 아래로 통과시킨다.
+        // ---------------------------------------------------------------
+        performDownJump() {
+            if (this.physics.overlap(this.player, this.mainFloorGround)) return; // 맨 아래 바닥에서는 아래 점프 불가
+
+            this.isDownJumping = true;
+            this.dropThroughGrounds.forEach(g => g.body.checkCollision.up = false);
+            this.player.setVelocityY(150); // 발판을 확실히 통과하도록 아래로 살짝 밀어줌
+
+            this.time.delayedCall(300, () => {
+                this.dropThroughGrounds.forEach(g => g.body.checkCollision.up = true);
+                this.isDownJumping = false;
+            });
+        }
+
+        // ---------------------------------------------------------------
         // 매 프레임 갱신: 좌표 표시, 좌우 이동, 점프, 포탈 진입 체크, 애니메이션 전환
         // ---------------------------------------------------------------
         update() {
@@ -565,6 +644,7 @@
             const moveLeft = this.controls.left || this.cursors.left.isDown;
             const moveRight = this.controls.right || this.cursors.right.isDown;
             const moveUp = this.controls.up || this.cursors.up.isDown;
+            const moveDown = this.controls.down || this.cursors.down.isDown;
             const jumpPressed = this.spaceKey.isDown;
 
             // 좌우 이동
@@ -576,11 +656,9 @@
                 this.player.setVelocityX(0);
             }
 
-            // 키보드 스페이스바 점프
-            if (jumpPressed && this.player.body.blocked.down) {
-                this.player.setVelocityY(-550);
-                if (!this.isJumping) this.sound.play('bgm_jump');
-                this.isJumping = true;
+            // 키보드 스페이스바 점프 (아래 방향키 동시 입력 시 아래 점프로 분기)
+            if (jumpPressed) {
+                this.tryJump(moveDown, -550);
             }
 
             // 포탈/히든포탈 진입 체크 (방향키 위 + 포탈 근처일 때)
@@ -588,10 +666,13 @@
                 this.checkPortalEntry();
             }
 
-            // 점프/걷기/대기 애니메이션 전환
-            if (this.isJumping) {
+            // 애니메이션 전환: 공중(점프) > 아래방향(엎드림) > 좌우이동(걷기) > 대기(숨쉬기)
+            if (!this.player.body.blocked.down) {
                 const anim = Math.abs(this.player.body.velocity.y) < 50 ? 'jump_peak' : 'jump_up';
                 this.player.anims.play(`${this.myChar}_${anim}`, true);
+            } else if (moveDown) {
+                this.player.anims.stop();
+                this.player.setTexture(`${this.myChar}_prone`);
             } else if (moveLeft || moveRight) {
                 this.player.anims.play(`${this.myChar}_walking`, true);
             } else {
@@ -653,6 +734,9 @@
                 gravity: { y: 1200 },
                 roundPixels: true // 물리 바운딩 박스 정수 변환 처리
             }
+        },
+        input: {
+            activePointers: 3 // 모바일 동시 터치(방향키+점프 등) 인식을 위해 다중 포인터 추적 활성화
         },
         scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
         scene: [StartScene, SelectScene, VillageScene]
