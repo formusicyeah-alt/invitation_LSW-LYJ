@@ -581,6 +581,20 @@
             this.game.canvas.setAttribute('tabindex', '0');
             this.game.canvas.focus();
 
+            // 다른 창/탭으로 포커스가 넘어가면 keyup 이벤트를 못 받아 키가 "눌린 채로 끼이는"
+            // 경우가 있을 수 있어서, 포커스를 잃으면 모든 키 상태를 강제로 초기화한다.
+            this._onWindowBlur = () => {
+                this.spaceKey.reset();
+                this.cursors.up.reset();
+                this.cursors.down.reset();
+                this.cursors.left.reset();
+                this.cursors.right.reset();
+                this.nativeDownKeyHeld = false;
+                this.touchControls.left = this.touchControls.right = this.touchControls.up = this.touchControls.down = false;
+            };
+            window.addEventListener('blur', this._onWindowBlur);
+            this.events.once('shutdown', () => window.removeEventListener('blur', this._onWindowBlur));
+
             // 터치 버튼 눌림 상태 (방향키 4개)
             this.touchControls = { left: false, right: false, up: false, down: false };
             this.isJumping = false;       // 일반 점프 효과음이 한 번만 나도록 체크하는 플래그
@@ -616,7 +630,10 @@
                 right: this.touchControls.right || this.cursors.right.isDown,
                 up: this.touchControls.up || this.cursors.up.isDown,
                 down: this.touchControls.down || this.cursors.down.isDown || this.nativeDownKeyHeld,
-                jump: this.spaceKey.isDown,
+                // "누르고 있는 동안 계속(isDown)"이 아니라 "누르는 순간 단 한 번(JustDown)"만 점프로 인식.
+                // 만약 포커스 변경 등으로 keyup 이벤트를 놓쳐 isDown이 계속 true로 남아있어도,
+                // JustDown은 실제 keydown이 다시 발생하기 전까지 두 번 다시 true를 반환하지 않는다.
+                jump: Phaser.Input.Keyboard.JustDown(this.spaceKey),
             };
         }
 
