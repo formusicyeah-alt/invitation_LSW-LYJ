@@ -58,6 +58,8 @@
             this.load.audio('bgm_tel', 'audio/bgm_tel.mp3');
             this.load.audio('bgm_jump', 'audio/bgm_jump.mp3');
             this.load.image('arrow_0', 'images/arrow_0.png');
+            this.load.image('jump_key', 'images/jump_key.png');
+            this.load.image('npc_key', 'images/npc_key.png');
             
             this.load.audio('bgm_ch_select', 'audio/bgm_ch_select.mp3');
         }
@@ -410,11 +412,12 @@
 
             let downBtn = this.add.image(173, 630, 'arrow_0').setAngle(180).setScale(1.75).setInteractive().setScrollFactor(0).setDepth(9999);
             downBtn.on('pointerdown', () => this.controls.down = true).on('pointerup', () => this.controls.down = false).on('pointerout', () => this.controls.down = false);
-            
-            let jumpBtn = this.add.text(1100, 600, '점프', btnStyle).setInteractive().setScrollFactor(0).setDepth(9999);
-            jumpBtn.on('pointerdown', () => { 
-                this.controls.jumpJustPressed = true; 
-            });
+
+            let jumpBtn = this.add.image(1100, 630, 'jump_key').setScale(0.3).setInteractive().setScrollFactor(0).setDepth(9999);
+            jumpBtn.on('pointerdown', () => this.controls.jumpJustPressed = true).on('pointerup', () => this.controls.jumpJustPressed = false).on('pointerout', () => this.controls.jumpJustPressed = false);
+
+            let npcBtn = this.add.image(1200, 630, 'npc_key').setScale(0.3).setInteractive().setScrollFactor(0).setDepth(9999);
+            downBtn.on('pointerdown', () => this.controls.npc = true).on('pointerup', () => this.controls.npc = false).on('pointerout', () => this.controls.npc = false);
 
             let soundBtn = this.add.image(1200, 50, this.isSoundOn ? 'sound_on' : 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1).setScrollFactor(0).setDepth(9999);
 
@@ -583,7 +586,7 @@
         physics: { 
             default: 'arcade', 
             arcade: { 
-                gravity: { y: 900 }
+                gravity: { y: 1200 }
                 // 💡 roundPixels: true 옵션을 제거하여 1픽셀 오차 진동 현상 방지
             } 
         }, 
