@@ -585,6 +585,8 @@
             this.touchControls = { left: false, right: false, up: false, down: false };
             this.isJumping = false;       // 일반 점프 효과음이 한 번만 나도록 체크하는 플래그
             this.isDownJumping = false;   // 아래 점프(발판 통과)가 진행 중인지
+            this.isChargingDownJump = false; // 아래+점프 입력 후 1초간 엎드린 채로 대기 중인지
+            this.downJumpTimer = null;       // 위 대기 시간을 처리하는 타이머 (조기 취소를 위해 보관)
             this.isTeleporting = false;
             this.lastGroundedTime = 0;    // 마지막으로 바닥에 닿았던 시각(ms). 코요테 타임 판정에 사용
 
@@ -660,33 +662,64 @@
         }
 
         // ---------------------------------------------------------------
-        // 점프 시도: 최근에 바닥에 있었고, 아직 점프 중이 아닐 때만 동작.
-        // 아래 방향키를 누르고 있으면 일반 점프 대신 아래 점프(발판 통과)를 실행한다.
+        // 점프 시도: 최근에 바닥에 있었고, 아직 점프/예열 중이 아닐 때만 동작.
+        // 아래 방향키를 함께 누르고 있으면 즉시 떨어지지 않고, 1초간 엎드린 자세를
+        // 유지하다가(예열) 점프 모션으로 바뀌는 순간 아래 점프를 실행한다.
         // jumpVelocity: 일반 점프 시 적용할 상승 속도
         // ---------------------------------------------------------------
         tryJump(downHeld, jumpVelocity) {
-            if (!this.isGroundedRecently() || this.isJumping || this.isDownJumping) return false;
+            if (!this.isGroundedRecently() || this.isJumping || this.isDownJumping || this.isChargingDownJump) return false;
 
             if (downHeld) {
-                this.performDownJump();
+                this.startDownJumpCharge();
             } else {
                 this.player.setVelocityY(jumpVelocity);
                 this.sound.play('bgm_jump');
+                this.isJumping = true; // 실제로 바닥에 닿기 전까지는 다시 점프할 수 없음 (연속 점프 방지)
             }
-            this.isJumping = true; // 실제로 바닥에 닿기 전까지는 다시 점프할 수 없음 (연속 점프 방지)
             return true;
         }
 
         // ---------------------------------------------------------------
-        // 아래 점프: 현재 메인 바닥(맨 아래 0번 발판) 위에 있으면 무시하고,
+        // 아래 점프 예열: 1초 동안 엎드린 자세(prone)를 유지한 뒤, 점프 모션으로
+        // 전환하면서 실제 발판 통과(performDownJump)를 실행한다.
+        // 예열 중 아래 방향키를 떼면 그대로 취소된다.
+        // ---------------------------------------------------------------
+        startDownJumpCharge() {
+            this.isChargingDownJump = true;
+            this.player.anims.stop();
+            this.player.setTexture(`${this.myChar}_prone`);
+
+            this.downJumpTimer = this.time.delayedCall(1000, () => {
+                this.isChargingDownJump = false;
+                this.downJumpTimer = null;
+                this.performDownJump();
+            });
+        }
+
+        // ---------------------------------------------------------------
+        // 아래 점프 예열 취소: 1초가 지나기 전에 아래 방향키를 떼면 호출됨
+        // ---------------------------------------------------------------
+        cancelDownJumpCharge() {
+            if (this.downJumpTimer) {
+                this.downJumpTimer.remove();
+                this.downJumpTimer = null;
+            }
+            this.isChargingDownJump = false;
+        }
+
+        // ---------------------------------------------------------------
+        // 아래 점프 실행: 현재 메인 바닥(맨 아래 0번 발판) 위에 있으면 무시하고,
         // 그 외 발판이면 잠시 위쪽 충돌을 꺼서 아래로 통과시킨다.
         // ---------------------------------------------------------------
         performDownJump() {
             if (this.isOnMainFloor) return; // 맨 아래 바닥에서는 아래 점프 불가
 
+            this.isJumping = true;       // 떨어지는 동안 다시 점프 입력이 들어가지 않도록 잠금
             this.isDownJumping = true;
             this.dropThroughGrounds.forEach(g => g.body.checkCollision.up = false);
             this.player.setVelocityY(150); // 발판을 확실히 통과하도록 아래로 살짝 밀어줌
+            this.lastGroundedTime = 0;     // 코요테 타임 대기 없이 즉시 점프 모션으로 보이도록
 
             this.time.delayedCall(300, () => {
                 this.dropThroughGrounds.forEach(g => g.body.checkCollision.up = true);
@@ -715,8 +748,15 @@
             // ② 입력 읽기 (키보드+터치 통합, 한 곳에서만 계산)
             const input = this.readInput();
 
-            // ③ 좌우 이동
-            if (input.left) {
+            // 아래 점프 예열 중에 아래 방향키를 떼면 예열을 취소한다
+            if (this.isChargingDownJump && !input.down) {
+                this.cancelDownJumpCharge();
+            }
+
+            // ③ 좌우 이동 (아래 방향키를 누르고 있는 동안은 엎드린 상태이므로 이동하지 않는다)
+            if (input.down) {
+                this.player.setVelocityX(0);
+            } else if (input.left) {
                 this.player.setVelocityX(-198).setFlipX(false);
             } else if (input.right) {
                 this.player.setVelocityX(198).setFlipX(true);
