@@ -10,15 +10,15 @@
         #game-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; z-index: 1; }
         #portrait-warning { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #ffffff; color: #000000; display: none; justify-content: center; align-items: center; z-index: 9999; text-align: center; font-family: "Arial", sans-serif; }
         @media screen and (orientation: portrait) { #portrait-warning { display: flex; } }
-
-        /* 캔버스 확대 시 화질 저하 방지 */
+        
+        /* 💡 캔버스 자체의 스타일링을 통해 브라우저 확대 시 화질 저하 추가 방지 */
         canvas {
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
             image-rendering: pixelated;
         }
 
-        /* 마우스 커서 이미지 전역 설정 (Phaser 기본 pointer 설정보다 우선 적용) */
+        /* 💡 2. 마우스 커서 이미지 전역 설정 (Phaser의 기본 pointer 설정보다 강제로 우선 적용) */
         * {
             cursor: url('images/click_0.png'), auto !important;
         }
@@ -153,6 +153,7 @@
 
             // --- 사운드 ON/OFF 버튼 + 선택 화면 BGM ---
             let soundBtn = this.add.image(1200, 50, 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1);
+
             let bgm = this.cache.audio.exists('bgm_select')
                 ? this.sound.add('bgm_select', { loop: true, volume: 0.5 })
                 : null;
@@ -184,9 +185,10 @@
                 createAnim(this, `${char}_walking`, `${char}_walk1`, 5);
             });
 
-            let manBtn = this.add.sprite(500, 550, 'man_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('man_breathing');
-            let womanBtn = this.add.sprite(725, 550, 'woman_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('woman_breathing');
-            let tobenBtn = this.add.sprite(950, 550, 'toben_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('toben_breathing');
+            let manBtn = this.add.sprite(500, 510, 'man_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('man_breathing');
+            let womanBtn = this.add.sprite(725, 510, 'woman_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('woman_breathing');
+            let tobenBtn = this.add.sprite(950, 510, 'toben_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('toben_breathing');
+
             const charButtons = [manBtn, womanBtn, tobenBtn];
 
             // 캐릭터 선택 시: 선택된 캐릭터만 밝게(걷기 애니메이션) + 나머지는 반투명(숨쉬기) + 스포트라이트 이동 + 선택 효과음
@@ -194,6 +196,7 @@
                 charButtons.forEach(b => {
                     b.setAlpha(0.5).play(`${b.texture.key.split('_')[0]}_breathing`);
                 });
+
                 targetBtn.setAlpha(1).play(`${charName}_walking`);
                 this.selectedChar = charName;
                 this.spotlight.setVisible(true).setPosition(targetBtn.x, targetBtn.y - 250);
@@ -282,6 +285,7 @@
             { npc: 'camera',   key: 'text_camera',   dx: 60,  dy: -123 },
             { npc: 'letter',   key: 'text_letter',   dx: 20,  dy: -115 },
         ];
+
         // 고정 NPC(혼주)도 같은 패턴을 쓰지만 별도 목록(고정 NPC 객체를 따로 참조하기 위함)
         static SPEECH_SINGLE_FIXED = [
             { npc: 'bride_fa_sit', key: 'text_bride_pa', dx: -50, dy: -100 },
@@ -307,47 +311,47 @@
         // 발판(충돌 영역) 목록: [x, y, width, height]
         // 시각적으로는 보이지 않는 투명 사각형이며, 캐릭터가 밟고 서는 바닥/계단 역할을 합니다.
         static GROUNDS = [
-            [3016 / 2, 1245 - 115, 3016, 20], // 맵 전체 바닥
-            [200, 450, 550, 20],
-            [235, 540, 60, 20],
-            [235, 650, 60, 20],
-            [50, 490, 65, 20],
-            [50, 600, 65, 20],
-            [530, 685, 390, 20],
-            [860, 740, 100, 20],
-            [1150, 800, 350, 20],
-            [1400, 820, 5, 10],
-            [1470, 875, 5, 10],
-            [2063, 925, 1000, 20],
-            [1950, 880, 650, 20],
-            [1980, 825, 600, 20],
-            [1777.5, 1080, 140, 10],
-            [1822.5, 1025, 140, 10],
-            [1865, 970, 140, 10],
-            [2350, 1053, 870, 10],
-            [2398, 1002, 595, 10],
+            [3016 / 2, 1102, 3016, 20], // 맵 전체 바닥
+            [200, 420, 550, 20],
+            [235, 510, 60, 20],
+            [235, 620, 60, 20],
+            [50, 460, 65, 20],
+            [50, 570, 65, 20],
+            [530, 655, 390, 20],
+            [860, 710, 100, 20],
+            [1150, 770, 350, 20],
+            [1400, 790, 5, 10],
+            [1470, 845, 5, 10],
+            [2063, 895, 1000, 20],
+            [1950, 850, 650, 20],
+            [1980, 795, 600, 20],
+            [1777.5, 1050, 140, 10],
+            [1822.5, 995, 140, 10],
+            [1865, 940, 140, 10],
+            [2350, 1023, 870, 10],
+            [2398, 972, 595, 10],
             // 아래는 좁은 계단/발판 구간 (보이지 않는 히트박스. 통과 떨림 방지를 위해 두께를 10px로 확보)
-            [995, 690, 3, 10],
-            [1060, 660, 3, 10],
-            [1100, 610, 3, 10],
-            [1175, 580, 3, 10],
-            [1240, 565, 3, 10],
-            [1300, 535, 3, 10],
-            [1330, 475, 3, 10],
-            [1335, 420, 3, 10],
-            [1325, 365, 3, 10],
-            [1290, 315, 3, 10],
-            [1220, 285, 3, 10],
-            [1145, 300, 3, 10],
-            [1065, 305, 3, 10],
-            [990, 300, 3, 10],
-            [930, 340, 3, 10],
-            [915, 395, 3, 10],
-            [910, 445, 3, 10],
-            [940, 495, 3, 10],
-            [990, 540, 3, 10],
-            [1055, 575, 3, 10],
-            [1110, 530, 100, 20],
+            [995, 660, 3, 10],
+            [1060, 630, 3, 10],
+            [1100, 580, 3, 10],
+            [1175, 550, 3, 10],
+            [1240, 535, 3, 10],
+            [1300, 505, 3, 10],
+            [1330, 445, 3, 10],
+            [1335, 390, 3, 10],
+            [1325, 335, 3, 10],
+            [1290, 285, 3, 10],
+            [1220, 255, 3, 10],
+            [1145, 270, 3, 10],
+            [1065, 275, 3, 10],
+            [990, 270, 3, 10],
+            [930, 310, 3, 10],
+            [915, 365, 3, 10],
+            [910, 415, 3, 10],
+            [940, 465, 3, 10],
+            [990, 510, 3, 10],
+            [1055, 545, 3, 10],
+            [1110, 500, 100, 20],
         ];
 
         // 점프 시 적용할 상승 속도 (입력 수단별로 다르게 유지)
@@ -364,7 +368,6 @@
             { control: 'up',    x: 179, y: 550, angle: 0 },
             { control: 'down',  x: 175, y: 635, angle: 180 },
         ];
-
 
         preload() {
             // 고정 NPC(혼주) 이미지
@@ -389,8 +392,12 @@
             this.add.image(0, 0, 'bg_wedding_village').setOrigin(0, 0).setScale(0.5);
 
             // --- NPC 배치 ---
-            const npcRefs = this.createNpcs();      // { 이름: 스프라이트/이미지 객체 } 형태로 반환
-            this.createSpeechBubbles(npcRefs);        // 말풍선 생성 + 타이머 등록
+            const npcRefs = this.createNpcs();
+
+            // { 이름: 스프라이트/이미지 객체 } 형태로 반환
+            this.createSpeechBubbles(npcRefs);
+
+            // 말풍선 생성 + 타이머 등록
 
             // --- 포탈 / 히든 포탈 ---
             this.createPortals();
@@ -401,6 +408,7 @@
 
             this.player = this.physics.add.sprite(120, 400, `${this.myChar}_stand1_0`)
                 .setScale(1.5).setOrigin(0.5, 1).setCollideWorldBounds(true).setBounce(0).setDepth(10);
+
             this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
             // 플레이어 점프 애니메이션(상승/정점 각 1프레임)
@@ -429,7 +437,6 @@
         // ---------------------------------------------------------------
         createNpcs() {
             const refs = {};
-
             VillageScene.FIXED_NPCS.forEach(npc => {
                 refs[npc.key] = this.add.image(npc.x, npc.y, npc.key).setOrigin(0.5, 1).setScale(1.5).setDepth(5);
             });
@@ -445,7 +452,6 @@
                 if (npc.flipX) sprite.setFlipX(true);
                 refs[npc.name] = sprite;
             });
-
             return refs;
         }
 
@@ -460,6 +466,7 @@
 
             const allSingle = [...VillageScene.SPEECH_SINGLE, ...VillageScene.SPEECH_SINGLE_FIXED];
             const singleBubbles = allSingle.map(s => makeBubble(npcRefs[s.npc], s.key, s.dx, s.dy));
+
             const relayBubbles = VillageScene.SPEECH_RELAY.map(s => ({
                 b1: makeBubble(npcRefs[s.npc], s.key1, s.dx, s.dy),
                 b2: makeBubble(npcRefs[s.npc], s.key2, s.dx, s.dy),
@@ -568,6 +575,7 @@
             this._onNativeKeyUp = (e) => { if (e.code === 'ArrowDown') this.nativeDownKeyHeld = false; };
             window.addEventListener('keydown', this._onNativeKeyDown);
             window.addEventListener('keyup', this._onNativeKeyUp);
+
             this.events.once('shutdown', () => {
                 window.removeEventListener('keydown', this._onNativeKeyDown);
                 window.removeEventListener('keyup', this._onNativeKeyUp);
@@ -589,18 +597,22 @@
                 this.touchControls.left = this.touchControls.right = this.touchControls.up = this.touchControls.down = false;
             };
             window.addEventListener('blur', this._onWindowBlur);
+
             this.events.once('shutdown', () => window.removeEventListener('blur', this._onWindowBlur));
 
             // 터치 버튼 눌림 상태 (방향키 4개)
             this.touchControls = { left: false, right: false, up: false, down: false };
             this.isJumping = false;        // 공중에 떠 있는 동안(일반 점프든 아래점프든) 다시 점프 못 하게 막는 플래그
             this.isTeleporting = false;
-            this.lastGroundedTime = 0;     // 마지막으로 바닥에 닿았던 시각(ms). 코요테 타임 판정에 사용
+            
+            // 💡 1초 딜레이 아래 점프를 위해 필요한 추가 상태 플래그
+            this.isPreparingDownJump = false; 
 
-            // 아래 점프 상태 머신: 'none'(평상시) → 'charging'(엎드려서 1초 대기) → 'falling'(통과 중) → 'none'
-            this.downJumpState = 'none';
-            this.downJumpTargetGround = null; // 통과시킬 "그 발판 하나"만 정확히 기억해둔다
-            this.downJumpTimer = null;        // 1초 대기 타이머 (도중에 취소할 수 있도록 보관)
+            this.lastGroundedTime = 0;     // 마지막으로 바닥에 닿았던 시각(ms). 코요테 타임 판정에 사용
+            this._prevDownPressed = false;
+            // 🔍 진단용: 아래키가 "방금 눌렸는지" 판단하기 위한 이전 프레임 상태
+            this._prevAirborne = false;
+            // 🔍 진단용: "방금 공중으로 전환됐는지" 판단하기 위한 이전 프레임 상태
 
             // 방향키 버튼 4개를 화살표 이미지 1장으로 회전시켜 생성
             VillageScene.DIRECTION_BUTTONS.forEach(btn => {
@@ -640,10 +652,13 @@
         // ---------------------------------------------------------------
         setupSoundButton() {
             let bgm = null;
+
             if (this.cache.audio.exists('bgm_wedding_village')) {
                 bgm = this.sound.add('bgm_wedding_village', { loop: true, volume: 0 });
+
                 if (this.isSoundOn) {
                     bgm.play();
+
                     this.tweens.add({ targets: bgm, volume: 0.5, duration: 1000 });
                 }
             }
@@ -686,11 +701,27 @@
         // downHeld: 점프를 누르는 "그 순간" 아래 방향키도 같이 눌려있었는지
         // jumpVelocity: 일반 점프 시 적용할 상승 속도
         attemptJump(downHeld, jumpVelocity) {
-            // 실제로 바닥에 닿아 있어야 하고, 공중에 떠 있거나 이미 아래점프 진행 중이면 무시
-            if (!this.player.body.blocked.down || this.isJumping || this.downJumpState !== 'none') return;
+            // 🔍 진단용 로그: 이 함수가 호출될 때마다 어떤 값이 들어왔는지 콘솔에 출력
+            console.log('[attemptJump 호출됨]', 'downHeld =', downHeld, '| blocked.down =', this.player.body.blocked.down, '| isJumping =', this.isJumping);
+
+            // 실제로 바닥에 닿아 있어야 하고, 이미 공중에 떠 있으면 무시
+            if (!this.player.body.blocked.down || this.isJumping) return;
 
             if (downHeld) {
-                this.startDownJumpCharge();
+                // 맨 밑바닥인지 확인 (바닥이 없거나, 바닥이 맨 아랫층이면 무시)
+                if (!this.standingOn || this.standingOn === this.mainFloorGround) return;
+                
+                // 이미 아래 점프 준비 중이면 무시
+                if (this.isPreparingDownJump) return;
+                
+                // 💡 1초 딜레이 아래 점프를 위해 상태 진입
+                this.isPreparingDownJump = true;
+                
+                // 1초 대기 후 실제 하강 로직 작동 (1000ms. 너무 답답하면 이 숫자를 100이나 200으로 줄여!)
+                this.time.delayedCall(1000, () => {
+                    this.isPreparingDownJump = false;
+                    this.performDownJump();
+                });
             } else {
                 this.player.setVelocityY(jumpVelocity);
                 this.sound.play('bgm_jump');
@@ -699,59 +730,22 @@
         }
 
         // ---------------------------------------------------------------
-        // 아래 점프 1단계: 지금 밟고 있는 "그 발판 하나"를 정확히 기억해두고,
-        // 1초 동안 엎드린 자세(prone)를 유지한다. 도중에 아래 방향키를 떼면 취소된다.
+        // 아래 점프: 지금 밟고 있는 "그 발판 하나"만 잠깐 충돌을 꺼서 통과시킨다.
+        // (1초 딜레이 타이머가 끝난 뒤 호출됨)
         // ---------------------------------------------------------------
-        startDownJumpCharge() {
-            if (!this.standingOn) return; // 어떤 발판인지 확정할 수 없으면 시도하지 않음
+        performDownJump() {
+            const target = this.standingOn;
+            console.log('[performDownJump 실행됨]', 'target =', target, '| mainFloorGround =', this.mainFloorGround, '| 같은 발판?', target === this.mainFloorGround);
 
-            this.downJumpState = 'charging';
-            this.downJumpTargetGround = this.standingOn; // 통과시킬 대상은 "이 발판 하나"로 고정
+            if (!target || target === this.mainFloorGround) return; // 통과 대상이 없거나 맨 아래 바닥이면 무시
 
-            this.player.anims.stop();
-            this.player.setTexture(`${this.myChar}_prone`);
-
-            this.downJumpTimer = this.time.delayedCall(1000, () => this.executeDownJump());
-        }
-
-        // ---------------------------------------------------------------
-        // 아래 점프 1초 예열 취소: 1초가 지나기 전에 아래 방향키를 떼면 호출됨
-        // ---------------------------------------------------------------
-        cancelDownJumpCharge() {
-            if (this.downJumpTimer) {
-                this.downJumpTimer.remove();
-                this.downJumpTimer = null;
-            }
-            this.downJumpState = 'none';
-            this.downJumpTargetGround = null;
-        }
-
-        // ---------------------------------------------------------------
-        // 아래 점프 2단계(실제 통과): 1초 예열이 끝난 시점에 호출된다.
-        // 맨 아래 바닥(mainFloorGround)이면 무시하고, 그 외에는 "기억해둔 발판 하나만"
-        // 잠시 충돌을 꺼서 통과시킨다 (다른 발판들은 전혀 영향받지 않는다).
-        // ---------------------------------------------------------------
-        executeDownJump() {
-            const target = this.downJumpTargetGround;
-            this.downJumpTimer = null;
-
-            if (!target || target === this.mainFloorGround) {
-                // 맨 아래 바닥에서는 아래 점프 불가 → 예열만 풀고 평소 상태로 복귀
-                this.downJumpState = 'none';
-                this.downJumpTargetGround = null;
-                return;
-            }
-
-            this.downJumpState = 'falling';
-            this.isJumping = true; // 떨어지는 동안 다시 점프 입력이 들어가지 않도록 잠금
+            this.isJumping = true;
             target.body.checkCollision.up = false; // 이 발판 "하나만" 통과 가능하게
-            this.player.setVelocityY(150);          // 발판을 확실히 통과하도록 아래로 살짝 밀어줌
-            this.lastGroundedTime = 0;               // 코요테 타임 대기 없이 즉시 점프 모션으로 보이도록
+            this.player.setVelocityY(150); // 발판을 확실히 통과하도록 아래로 살짝 밀어줌
+            this.lastGroundedTime = 0; // 코요테 타임 대기 없이 즉시 점프 모션으로 보이도록
 
             this.time.delayedCall(400, () => {
                 target.body.checkCollision.up = true; // 통과시켰던 발판만 다시 원래대로 복구
-                this.downJumpState = 'none';
-                this.downJumpTargetGround = null;
             });
         }
 
@@ -776,13 +770,21 @@
             // ② 입력 읽기 (키보드+터치 통합, 한 곳에서만 계산)
             const input = this.readInput();
 
-            // 아래 점프 예열 중에 아래 방향키를 떼면 예열을 취소한다
-            if (this.downJumpState === 'charging' && !input.down) {
-                this.cancelDownJumpCharge();
+            // 🔍 진단용 로그: 아래키가 "방금 눌린" 그 순간, 캐릭터의 실제 위치와 접지 상태를 출력
+            if (input.down && !this._prevDownPressed) {
+                const g = this.standingOn;
+                console.log(
+                    '[DOWN 눌림]',
+                    'player(x,y) =', this.player.x.toFixed(1), this.player.y.toFixed(1),
+                    '| blocked.down =', this.player.body.blocked.down,
+                    '| velocity.y =', this.player.body.velocity.y.toFixed(1),
+                    '| standingOn(x,y,w,h) =', g ? `${g.x}, ${g.y}, ${g.width}, ${g.height}` : null
+                );
             }
+            this._prevDownPressed = input.down;
 
-            // ③ 좌우 이동 (아래 방향키를 누르고 있는 동안은 엎드린 상태이므로 이동하지 않는다)
-            if (input.down) {
+            // ③ 좌우 이동 (아래 방향키를 누르고 있거나 1초 대기 상태일 때는 이동하지 않는다)
+            if (this.isPreparingDownJump || input.down) {
                 this.player.setVelocityX(0);
             } else if (input.left) {
                 this.player.setVelocityX(-198).setFlipX(false);
@@ -792,25 +794,42 @@
                 this.player.setVelocityX(0);
             }
 
-            // ④ 점프 (스페이스바를 "누르는 순간"에만 1회 시도). attemptJump 내부에서
-            //    아래 방향키가 같이 눌려있으면 자동으로 아래 점프 예열로 분기된다.
-            if (input.jump) {
+            // ④ 점프 (스페이스바를 "누르는 순간"에만 1회 시도).
+            // attemptJump 내부에서 아래 방향키가 같이 눌려있으면 자동으로 아래 점프로 분기된다.
+            // (1초 대기 중에 추가로 점프키가 먹히지 않게 isPreparingDownJump 조건 추가)
+            if (input.jump && !this.isPreparingDownJump) {
                 this.attemptJump(input.down, VillageScene.JUMP_VELOCITY.keyboard);
             }
 
             // ⑤ 포탈/히든포탈 진입 체크 (방향키 위 + 포탈 근처일 때)
-            if (input.up && !this.isTeleporting) {
+            // 1초 하강 대기 중에는 포탈도 막습니다.
+            if (input.up && !this.isTeleporting && !this.isPreparingDownJump) {
                 this.checkPortalEntry();
             }
 
             // ⑥ 애니메이션 결정: 공중(점프) > 아래방향(엎드림) > 좌우이동(걷기) > 대기(숨쉬기)
-            //    "공중"은 코요테 타임을 벗어났을 때만 인정해서, 물리 판정이 잠깐 흔들려도
-            //    화면에서는 점프/대기 모션이 깜빡이지 않는다.
             const isAirborne = !this.isGroundedRecently();
-            if (isAirborne) {
+
+            // 🔍 진단용 로그: "방금" 공중 상태로 바뀐 그 프레임의 상세 정보 출력
+            if (isAirborne && !this._prevAirborne) {
+                console.log(
+                    '[공중 전환됨]',
+                    'player(x,y) =', this.player.x.toFixed(1), this.player.y.toFixed(1),
+                    '| velocity.y =', this.player.body.velocity.y.toFixed(1),
+                    '| input.down =', input.down,
+                    '| isJumping =', this.isJumping
+                );
+            }
+            this._prevAirborne = isAirborne;
+
+            // 💡 1초간 아래 점프 준비 중일 때 & 아래 키 누르고 있을 때 강제 Prone 이미지 적용
+            if (this.isPreparingDownJump) {
+                this.player.anims.stop();
+                this.player.setTexture(`${this.myChar}_prone`);
+            } else if (isAirborne) {
                 const anim = Math.abs(this.player.body.velocity.y) < 50 ? 'jump_peak' : 'jump_up';
                 this.player.anims.play(`${this.myChar}_${anim}`, true);
-            } else if (input.down || this.downJumpState === 'charging') {
+            } else if (input.down) {
                 this.player.anims.stop();
                 this.player.setTexture(`${this.myChar}_prone`);
             } else if (input.left || input.right) {
