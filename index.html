@@ -526,7 +526,7 @@
         // ---------------------------------------------------------------
         createGrounds() {
             this.groundObjects = [];
-            this.isOnMainFloor = false; // 이번 프레임에 메인 바닥과 충돌 중인지 (아래 충돌 콜백에서 세팅됨)
+            this.standingOn = null; // 이번 프레임에 실제로 충돌(접지)한 "그 발판 하나" (충돌 콜백에서만 세팅됨)
 
             VillageScene.GROUNDS.forEach(([x, y, w, h], index) => {
                 const ground = this.add.rectangle(x, y, w, h, 0x00ff00, 0);
@@ -536,17 +536,13 @@
                 ground.body.checkCollision.right = false;
                 this.groundObjects.push(ground);
 
-                if (index === 0) {
-                    // 메인 바닥(맵 전체를 받치는 0번 발판): 충돌이 "실제로 발생한 프레임"에만
-                    // 콜백이 호출되므로, overlap 체크보다 훨씬 정확하게 "지금 메인 바닥 위에 있는지" 판단 가능
-                    this.physics.add.collider(this.player, ground, () => { this.isOnMainFloor = true; });
-                } else {
-                    this.physics.add.collider(this.player, ground);
-                }
+                // 충돌이 "실제로 발생한 프레임"에만 콜백이 호출되므로, 지금 정확히 어떤
+                // 발판을 밟고 있는지 이 콜백을 통해서만 판단한다 (overlap 체크보다 정확함).
+                this.physics.add.collider(this.player, ground, () => { this.standingOn = ground; });
             });
 
-            // 맨 아래 바닥(0번)은 아래점프로 통과할 수 없도록 통과 가능 목록에서 제외
-            this.dropThroughGrounds = this.groundObjects.slice(1);
+            // 맨 아래 바닥(0번, 맵 전체를 받치는 발판)은 아래점프로 통과할 수 없는 발판으로 별도 기억
+            this.mainFloorGround = this.groundObjects[0];
         }
 
         // ---------------------------------------------------------------
@@ -597,12 +593,14 @@
 
             // 터치 버튼 눌림 상태 (방향키 4개)
             this.touchControls = { left: false, right: false, up: false, down: false };
-            this.isJumping = false;       // 일반 점프 효과음이 한 번만 나도록 체크하는 플래그
-            this.isDownJumping = false;   // 아래 점프(발판 통과)가 진행 중인지
-            this.isChargingDownJump = false; // 아래+점프 입력 후 1초간 엎드린 채로 대기 중인지
-            this.downJumpTimer = null;       // 위 대기 시간을 처리하는 타이머 (조기 취소를 위해 보관)
+            this.isJumping = false;        // 공중에 떠 있는 동안(일반 점프든 아래점프든) 다시 점프 못 하게 막는 플래그
             this.isTeleporting = false;
-            this.lastGroundedTime = 0;    // 마지막으로 바닥에 닿았던 시각(ms). 코요테 타임 판정에 사용
+            this.lastGroundedTime = 0;     // 마지막으로 바닥에 닿았던 시각(ms). 코요테 타임 판정에 사용
+
+            // 아래 점프 상태 머신: 'none'(평상시) → 'charging'(엎드려서 1초 대기) → 'falling'(통과 중) → 'none'
+            this.downJumpState = 'none';
+            this.downJumpTargetGround = null; // 통과시킬 "그 발판 하나"만 정확히 기억해둔다
+            this.downJumpTimer = null;        // 1초 대기 타이머 (도중에 취소할 수 있도록 보관)
 
             // 방향키 버튼 4개를 화살표 이미지 1장으로 회전시켜 생성
             VillageScene.DIRECTION_BUTTONS.forEach(btn => {
@@ -613,10 +611,10 @@
                     .on('pointerout', () => this.touchControls[btn.control] = false); // 손가락이 버튼 밖으로 벗어나도 눌림 해제
             });
 
-            // 점프 버튼 (터치) - 누른 시점의 입력 상태를 그대로 읽어 일반/아래 점프를 판단
+            // 점프 버튼 (터치) - 누르는 순간에만 1회 점프 시도 (이 콜백이 점프를 시도하는 유일한 진입점 중 하나)
             const btnStyle = { font: '30px Arial', fill: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', padding: { x: 20, y: 20 } };
             this.add.text(1100, 600, '점프', btnStyle).setInteractive().setScrollFactor(0).setDepth(9999)
-                .on('pointerdown', () => this.tryJump(this.readInput().down, VillageScene.JUMP_VELOCITY.touch));
+                .on('pointerdown', () => this.attemptJump(this.readInput().down, VillageScene.JUMP_VELOCITY.touch));
         }
 
         // ---------------------------------------------------------------
@@ -672,20 +670,24 @@
 
         // ---------------------------------------------------------------
         // 코요테 타임(여유 판정): 물리 충돌 판정이 한두 프레임 떨려도
-        // 점프/애니메이션이 영향받지 않도록, "최근에 바닥에 닿았었는지"로 판단한다.
+        // 애니메이션이 영향받지 않도록, "최근에 바닥에 닿았었는지"로 판단한다.
+        // (이동/점프의 실제 동작에는 쓰이지 않는, 화면 표시 전용 보정)
         // ---------------------------------------------------------------
         isGroundedRecently() {
             return (this.time.now - this.lastGroundedTime) <= VillageScene.GROUND_GRACE_MS;
         }
 
-        // ---------------------------------------------------------------
-        // 점프 시도: 최근에 바닥에 있었고, 아직 점프/예열 중이 아닐 때만 동작.
-        // 아래 방향키를 함께 누르고 있으면 즉시 떨어지지 않고, 1초간 엎드린 자세를
-        // 유지하다가(예열) 점프 모션으로 바뀌는 순간 아래 점프를 실행한다.
+        // =================================================================
+        // 🦘 점프 / 아래 점프 — 진입점은 attemptJump() 단 하나뿐이다.
+        //  (키보드 스페이스바의 JustDown 시점, 터치 점프 버튼의 pointerdown 시점,
+        //   이 두 곳에서만 호출되며, 그 외 어디서도 점프를 발생시키지 않는다)
+        // =================================================================
+
+        // downHeld: 점프를 누르는 "그 순간" 아래 방향키도 같이 눌려있었는지
         // jumpVelocity: 일반 점프 시 적용할 상승 속도
-        // ---------------------------------------------------------------
-        tryJump(downHeld, jumpVelocity) {
-            if (!this.isGroundedRecently() || this.isJumping || this.isDownJumping || this.isChargingDownJump) return false;
+        attemptJump(downHeld, jumpVelocity) {
+            // 실제로 바닥에 닿아 있어야 하고, 공중에 떠 있거나 이미 아래점프 진행 중이면 무시
+            if (!this.player.body.blocked.down || this.isJumping || this.downJumpState !== 'none') return;
 
             if (downHeld) {
                 this.startDownJumpCharge();
@@ -694,53 +696,62 @@
                 this.sound.play('bgm_jump');
                 this.isJumping = true; // 실제로 바닥에 닿기 전까지는 다시 점프할 수 없음 (연속 점프 방지)
             }
-            return true;
         }
 
         // ---------------------------------------------------------------
-        // 아래 점프 예열: 1초 동안 엎드린 자세(prone)를 유지한 뒤, 점프 모션으로
-        // 전환하면서 실제 발판 통과(performDownJump)를 실행한다.
-        // 예열 중 아래 방향키를 떼면 그대로 취소된다.
+        // 아래 점프 1단계: 지금 밟고 있는 "그 발판 하나"를 정확히 기억해두고,
+        // 1초 동안 엎드린 자세(prone)를 유지한다. 도중에 아래 방향키를 떼면 취소된다.
         // ---------------------------------------------------------------
         startDownJumpCharge() {
-            this.isChargingDownJump = true;
+            if (!this.standingOn) return; // 어떤 발판인지 확정할 수 없으면 시도하지 않음
+
+            this.downJumpState = 'charging';
+            this.downJumpTargetGround = this.standingOn; // 통과시킬 대상은 "이 발판 하나"로 고정
+
             this.player.anims.stop();
             this.player.setTexture(`${this.myChar}_prone`);
 
-            this.downJumpTimer = this.time.delayedCall(1000, () => {
-                this.isChargingDownJump = false;
-                this.downJumpTimer = null;
-                this.performDownJump();
-            });
+            this.downJumpTimer = this.time.delayedCall(1000, () => this.executeDownJump());
         }
 
         // ---------------------------------------------------------------
-        // 아래 점프 예열 취소: 1초가 지나기 전에 아래 방향키를 떼면 호출됨
+        // 아래 점프 1초 예열 취소: 1초가 지나기 전에 아래 방향키를 떼면 호출됨
         // ---------------------------------------------------------------
         cancelDownJumpCharge() {
             if (this.downJumpTimer) {
                 this.downJumpTimer.remove();
                 this.downJumpTimer = null;
             }
-            this.isChargingDownJump = false;
+            this.downJumpState = 'none';
+            this.downJumpTargetGround = null;
         }
 
         // ---------------------------------------------------------------
-        // 아래 점프 실행: 현재 메인 바닥(맨 아래 0번 발판) 위에 있으면 무시하고,
-        // 그 외 발판이면 잠시 위쪽 충돌을 꺼서 아래로 통과시킨다.
+        // 아래 점프 2단계(실제 통과): 1초 예열이 끝난 시점에 호출된다.
+        // 맨 아래 바닥(mainFloorGround)이면 무시하고, 그 외에는 "기억해둔 발판 하나만"
+        // 잠시 충돌을 꺼서 통과시킨다 (다른 발판들은 전혀 영향받지 않는다).
         // ---------------------------------------------------------------
-        performDownJump() {
-            if (this.isOnMainFloor) return; // 맨 아래 바닥에서는 아래 점프 불가
+        executeDownJump() {
+            const target = this.downJumpTargetGround;
+            this.downJumpTimer = null;
 
-            this.isJumping = true;       // 떨어지는 동안 다시 점프 입력이 들어가지 않도록 잠금
-            this.isDownJumping = true;
-            this.dropThroughGrounds.forEach(g => g.body.checkCollision.up = false);
-            this.player.setVelocityY(150); // 발판을 확실히 통과하도록 아래로 살짝 밀어줌
-            this.lastGroundedTime = 0;     // 코요테 타임 대기 없이 즉시 점프 모션으로 보이도록
+            if (!target || target === this.mainFloorGround) {
+                // 맨 아래 바닥에서는 아래 점프 불가 → 예열만 풀고 평소 상태로 복귀
+                this.downJumpState = 'none';
+                this.downJumpTargetGround = null;
+                return;
+            }
 
-            this.time.delayedCall(300, () => {
-                this.dropThroughGrounds.forEach(g => g.body.checkCollision.up = true);
-                this.isDownJumping = false;
+            this.downJumpState = 'falling';
+            this.isJumping = true; // 떨어지는 동안 다시 점프 입력이 들어가지 않도록 잠금
+            target.body.checkCollision.up = false; // 이 발판 "하나만" 통과 가능하게
+            this.player.setVelocityY(150);          // 발판을 확실히 통과하도록 아래로 살짝 밀어줌
+            this.lastGroundedTime = 0;               // 코요테 타임 대기 없이 즉시 점프 모션으로 보이도록
+
+            this.time.delayedCall(400, () => {
+                target.body.checkCollision.up = true; // 통과시켰던 발판만 다시 원래대로 복구
+                this.downJumpState = 'none';
+                this.downJumpTargetGround = null;
             });
         }
 
@@ -766,7 +777,7 @@
             const input = this.readInput();
 
             // 아래 점프 예열 중에 아래 방향키를 떼면 예열을 취소한다
-            if (this.isChargingDownJump && !input.down) {
+            if (this.downJumpState === 'charging' && !input.down) {
                 this.cancelDownJumpCharge();
             }
 
@@ -781,9 +792,10 @@
                 this.player.setVelocityX(0);
             }
 
-            // ④ 점프 (스페이스바). 아래 방향키와 동시에 누르면 tryJump 내부에서 아래 점프로 분기됨
+            // ④ 점프 (스페이스바를 "누르는 순간"에만 1회 시도). attemptJump 내부에서
+            //    아래 방향키가 같이 눌려있으면 자동으로 아래 점프 예열로 분기된다.
             if (input.jump) {
-                this.tryJump(input.down, VillageScene.JUMP_VELOCITY.keyboard);
+                this.attemptJump(input.down, VillageScene.JUMP_VELOCITY.keyboard);
             }
 
             // ⑤ 포탈/히든포탈 진입 체크 (방향키 위 + 포탈 근처일 때)
@@ -798,7 +810,7 @@
             if (isAirborne) {
                 const anim = Math.abs(this.player.body.velocity.y) < 50 ? 'jump_peak' : 'jump_up';
                 this.player.anims.play(`${this.myChar}_${anim}`, true);
-            } else if (input.down) {
+            } else if (input.down || this.downJumpState === 'charging') {
                 this.player.anims.stop();
                 this.player.setTexture(`${this.myChar}_prone`);
             } else if (input.left || input.right) {
@@ -807,9 +819,9 @@
                 this.player.anims.play(`${this.myChar}_breathing`, true);
             }
 
-            // ⑦ 프레임 마무리: 메인 바닥 충돌 플래그를 리셋해서, 다음 프레임에 충돌이
-            //    실제로 일어났을 때만(콜백을 통해) 다시 true가 되도록 한다.
-            this.isOnMainFloor = false;
+            // ⑦ 프레임 마무리: "지금 밟고 있는 발판" 정보를 리셋해서, 다음 프레임에
+            //    실제로 충돌이 일어났을 때만(콜백을 통해) 다시 채워지도록 한다.
+            this.standingOn = null;
         }
 
         // ---------------------------------------------------------------
