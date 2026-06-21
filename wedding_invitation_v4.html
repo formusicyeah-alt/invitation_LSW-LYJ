@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>이승원,이유진 결혼합니다.</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background-color: #000; }
+        #game-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; z-index: 1; }
+        #portrait-warning { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #ffffff; color: #000000; display: none; justify-content: center; align-items: center; z-index: 9999; text-align: center; font-family: "Arial", sans-serif; }
+        /* 💡 세로화면이어도 무조건 뜨던 기존 미디어쿼리는 제거. 이제부터는 JS가 상황(인트로 전/후)에 맞춰 .active 클래스를 붙여줄 때만 표시됨 */
+        #portrait-warning.active { display: flex; }
+        
+        canvas {
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+        }
+
+        * {
+            cursor: url('images/click_0.png'), auto !important;
+        }
+    </style>
+</head>
+<body>
+<div id="portrait-warning"><h1>📱<br><br>화면을 가로로 돌려주세요!</h1></div>
+<div id="game-container"></div>
+
+<script>
+    // =========================================================================
+    // 📱 화면 방향 안내 제어
+    //  - 인트로(StartScene)에서는 세로화면이어도 안내를 띄우지 않는다.
+    //  - 인트로 영상을 탭해서 게임을 "시작"한 순간부터는, 세로화면일 때 회전 안내를 띄운다.
+    //  - enforceLandscapeWarning이 핵심 플래그: false면 항상 안내를 숨김, true면 세로일 때만 보임.
+    // =========================================================================
+    let enforceLandscapeWarning = false;
+
+    function updatePortraitWarning() {
+        const isPortrait = window.innerHeight > window.innerWidth;
+        const warningEl = document.getElementById('portrait-warning');
+        warningEl.classList.toggle('active', enforceLandscapeWarning && isPortrait);
+    }
+
+    window.addEventListener('resize', updatePortraitWarning);
+    window.addEventListener('orientationchange', updatePortraitWarning);
+    updatePortraitWarning(); // 최초 1회 실행 (이 시점엔 enforceLandscapeWarning=false라 항상 숨김 상태)
+
+    // 인트로 탭 시 호출: 가능하면 전체화면 + 가로 고정을 시도하고, 이후부터 회전 안내를 활성화한다.
+    //  - 가로 고정(screen.orientation.lock)은 안드로이드 Chrome 등 일부 브라우저에서만 동작하고,
+    //    iOS Safari는 지원하지 않는다(실패해도 무시하고 그냥 진행 - 그 경우 사용자가 직접 돌려야 함).
+    function enterLandscapeExperience(scaleManager) {
+        try {
+            if (!scaleManager.isFullscreen) scaleManager.startFullscreen();
+        } catch (e) {}
+
+        try {
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
+        } catch (e) {}
+
+        enforceLandscapeWarning = true;
+        updatePortraitWarning();
+    }
+
+    class StartScene extends Phaser.Scene {
+        constructor() { super({ key: 'StartScene' }); }
+        preload() {
+            for (let i = 0; i <= 20; i++) this.load.image(`invit_${i}`, `images/invit_${i}.png`);
+            this.load.image('bg_select', 'images/bg_select.png'); 
+            this.load.image('sign', 'images/sign.png'); 
+            this.load.image('title_sign', 'images/title_sign.png'); 
+            this.load.image('title', 'images/title.png'); 
+            
+            this.load.image('sound_on', 'images/sound_on.png');
+            this.load.image('sound_off', 'images/sound_off.png');
+            this.load.audio('bgm_select', 'audio/bgm_select.mp3');
+
+            this.load.image('bg_wedding_village', 'images/bg_wedding_village.png');
+            this.load.audio('bgm_wedding_village', 'audio/bgm_wedding_village.mp3');
+
+            const chars = ['man', 'woman', 'toben'];
+            chars.forEach(char => {
+                for(let z=0; z<=3; z++) this.load.image(`${char}_stand1_${z}`, `images/${char}_stand1_${z}.png`);
+                for(let z=0; z<=4; z++) this.load.image(`${char}_walk1_${z}`, `images/${char}_walk1_${z}.png`);
+                for(let z=0; z<=1; z++) this.load.image(`${char}_jump_${z}`, `images/${char}_jump_${z}.png`);
+                this.load.image(`${char}_prone`, `images/${char}_prone.png`);
+            });
+            for (let i = 0; i <= 7; i++) this.load.image(`portal_${i}`, `images/portal_${i}.png`);
+            for (let i = 1; i <= 5; i++) this.load.image(`hiden_portal_${i}`, `images/hiden_portal_${i}.png`);
+            for (let i = 0; i <= 5; i++) this.load.image(`sprite_${i}`, `images/sprite_${i}.png`);
+
+            this.load.audio('bgm_portal', 'audio/bgm_portal.mp3');
+            this.load.audio('bgm_tel', 'audio/bgm_tel.mp3');
+            this.load.audio('bgm_jump', 'audio/bgm_jump.mp3');
+            this.load.image('arrow_0', 'images/arrow_0.png');
+            this.load.image('jump_key', 'images/jump_key.png');
+            this.load.image('npc_key', 'images/npc_key.png');
+            
+            this.load.audio('bgm_ch_select', 'audio/bgm_ch_select.mp3');
+        }
+        create() {
+            this.anims.create({ key: 'invit_playing', frames: Array.from({length:21}, (_,i)=>({key:`invit_${i}`})), frameRate: 12, repeat: -1 });
+            this.add.sprite(640, 360, 'invit_0').setScale(2).play('invit_playing').setInteractive().on('pointerup', () => {
+                enterLandscapeExperience(this.scale); // 전체화면 + 가로 고정 시도 + 이후 회전 안내 활성화
+
+                this.cameras.main.fadeOut(1000, 0, 0, 0);
+                this.cameras.main.once('camerafadeoutcomplete', () => {
+                    this.scene.start('SelectScene');
+                });
+            });
+        }
+    }
+
+    class SelectScene extends Phaser.Scene {
+        constructor() { super({ key: 'SelectScene' }); }
+
+        create() {
+            this.cameras.main.fadeIn(1000, 0, 0, 0);
+
+            this.selectedChar = ""; 
+            this.isSoundOn = false; 
+            
+            this.add.image(640, 360, 'bg_select').setDisplaySize(1280, 720);
+            this.add.image(125, 170, 'title_sign').setScale(0.25);
+            
+            this.anims.create({ key: 'portal_playing', frames: Array.from({length: 8}, (_, i) => ({ key: `portal_${i}` })), frameRate: 5, repeat: -1 });
+            this.add.sprite(300, 500, 'portal_0').setOrigin(0.2, 1).setScale(1.5).play('portal_playing');
+
+            this.anims.create({ key: 'spotlight_playing', frames: Array.from({length: 6}, (_, i) => ({ key: `sprite_${i}` })), frameRate: 10, repeat: -1 });
+            this.spotlight = this.add.sprite(-200, -200, 'sprite_0').setScale(2).play('spotlight_playing').setVisible(false);
+
+            this.add.image(660, 170, 'title').setScale(0.45);
+
+            let soundBtn = this.add.image(1200, 50, 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1);
+            let bgm = null;
+            if (this.cache.audio.exists('bgm_select')) {
+                bgm = this.sound.add('bgm_select', { loop: true, volume: 0.5 });
+            }
+            soundBtn.on('pointerdown', (pointer, localX, localY, event) => {
+                if (event) event.stopPropagation();
+                if (!bgm) return; 
+                if (bgm.isPlaying) {
+                    bgm.pause(); 
+                    soundBtn.setTexture('sound_off'); 
+                    this.isSoundOn = false;
+                } else {
+                    if (bgm.isPaused) { bgm.resume(); } else { bgm.play(); }
+                    soundBtn.setTexture('sound_on'); 
+                    this.isSoundOn = true;
+                }
+            });
+
+            const chars = ['man', 'woman', 'toben'];
+            chars.forEach(char => {
+                this.anims.create({ key: `${char}_breathing`, frames: [ { key: `${char}_stand1_0` }, { key: `${char}_stand1_0` }, { key: `${char}_stand1_1` }, { key: `${char}_stand1_1` }, { key: `${char}_stand1_2` }, { key: `${char}_stand1_2` }, { key: `${char}_stand1_3` }, { key: `${char}_stand1_3` } ], frameRate: 6, repeat: -1 });
+                this.anims.create({ key: `${char}_walking`, frames: [ { key: `${char}_walk1_0` }, { key: `${char}_walk1_1` }, { key: `${char}_walk1_2` }, { key: `${char}_walk1_3` }, { key: `${char}_walk1_4` } ], frameRate: 6, repeat: -1 });
+            });
+            let manBtn = this.add.sprite(500, 510, 'man_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('man_breathing');
+            let womanBtn = this.add.sprite(725, 510, 'woman_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('woman_breathing');
+            let tobenBtn = this.add.sprite(950, 510, 'toben_stand1_0').setOrigin(0.5, 1).setInteractive().setScale(2).play('toben_breathing');
+            
+            const selectCharacter = (targetBtn, charName) => {
+                [manBtn, womanBtn, tobenBtn].forEach(b => { b.setAlpha(0.5); b.play(b.texture.key.split('_')[0] + '_breathing'); });
+                targetBtn.setAlpha(1).play(`${charName}_walking`);
+                this.selectedChar = charName; 
+                this.spotlight.setVisible(true).setPosition(targetBtn.x, targetBtn.y - 250);
+                
+                this.sound.stopByKey('bgm_ch_select');
+                this.sound.play('bgm_ch_select'); 
+            };
+            manBtn.on('pointerdown', () => selectCharacter(manBtn, 'man'));
+            womanBtn.on('pointerdown', () => selectCharacter(womanBtn, 'woman'));
+            tobenBtn.on('pointerdown', () => selectCharacter(tobenBtn, 'toben'));
+            
+            this.add.image(1150, 305, 'sign').setScale(0.3).setInteractive().on('pointerdown', () => { 
+                if(this.selectedChar) {
+                    this.sound.play('bgm_portal');
+
+                    this.cameras.main.fadeOut(1000, 0, 0, 0);
+                    this.cameras.main.once('camerafadeoutcomplete', () => {
+                        if (bgm && bgm.isPlaying) {
+                            this.tweens.add({
+                                targets: bgm,
+                                volume: 0,
+                                duration: 500,
+                                onComplete: () => {
+                                    bgm.stop();
+                                    this.scene.start('VillageScene', { character: this.selectedChar, isSoundOn: this.isSoundOn }); 
+                                }
+                            });
+                        } else {
+                            this.scene.start('VillageScene', { character: this.selectedChar, isSoundOn: this.isSoundOn }); 
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    class VillageScene extends Phaser.Scene {
+        constructor() { super({ key: 'VillageScene' }); }
+        init(data) { 
+            this.myChar = data.character; 
+            this.isSoundOn = data.isSoundOn;
+        }
+
+        preload() {
+            this.load.image('bride_fa_sit', 'images/bride_fa_sit.png');
+            this.load.image('bride_mo_sit', 'images/bride_mo_sit.png');
+            this.load.image('groom_fa_sit', 'images/groom_fa_sit.png');
+            this.load.image('groom_mo_sit', 'images/groom_mo_sit.png');
+
+            for (let i = 0; i <= 9; i++) this.load.image(`GM_${i}`, `images/GM_${i}.png`);
+            for (let i = 0; i <= 11; i++) this.load.image(`spinel_${i}`, `images/spinel_${i}.png`);
+            for (let i = 0; i <= 7; i++) this.load.image(`warena_${i}`, `images/warena_${i}.png`);
+            
+            for (let i = 0; i <= 3; i++) this.load.image(`groom_stand1_${i}`, `images/groom_stand1_${i}.png`);
+            for (let i = 0; i <= 3; i++) this.load.image(`bride_stand1_${i}`, `images/bride_stand1_${i}.png`);
+            
+            for (let i = 0; i <= 3; i++) this.load.image(`camera_${i}`, `images/camera_${i}.png`);
+            for (let i = 0; i <= 5; i++) this.load.image(`letter_${i}`, `images/letter_${i}.png`);
+
+            this.load.image('text_spinel', 'images/text_spinel.png');
+            this.load.image('text_warena', 'images/text_warena.png');
+            this.load.image('text_bride_pa', 'images/text_bride_pa.png');
+            this.load.image('text_groom_pa', 'images/text_groom_pa.png');
+            this.load.image('text_camera', 'images/text_camera.png');
+            this.load.image('text_letter', 'images/text_letter.png');
+
+            this.load.image('text_bride_1', 'images/text_bride_1.png');
+            this.load.image('text_bride_2', 'images/text_bride_2.png');
+            this.load.image('text_groom_1', 'images/text_groom_1.png');
+            this.load.image('text_groom_2', 'images/text_groom_2.png');
+            this.load.image('text_GM_1', 'images/text_GM_1.png');
+            this.load.image('text_GM_2', 'images/text_GM_2.png');
+        }
+
+        create() {
+            this.cameras.main.fadeIn(1000, 0, 0, 0);
+
+            this.add.image(0, 0, 'bg_wedding_village').setOrigin(0, 0).setScale(0.5);
+
+            this.anims.create({ key: 'anim_GM', frames: Array.from({length: 10}, (_, i) => ({ key: `GM_${i}` })), frameRate: 6, repeat: -1 });
+            this.anims.create({ key: 'anim_spinel', frames: Array.from({length: 12}, (_, i) => ({ key: `spinel_${i}` })), frameRate: 6, repeat: -1 });
+            this.anims.create({ key: 'anim_warena', frames: Array.from({length: 8}, (_, i) => ({ key: `warena_${i}` })), frameRate: 6, repeat: -1 });
+            
+            this.anims.create({ key: 'anim_groom', frames: Array.from({length: 4}, (_, i) => ({ key: `groom_stand1_${i}` })), frameRate: 6, repeat: -1 });
+            this.anims.create({ key: 'anim_bride', frames: Array.from({length: 4}, (_, i) => ({ key: `bride_stand1_${i}` })), frameRate: 6, repeat: -1 });
+            
+            this.anims.create({ key: 'anim_camera', frames: Array.from({length: 4}, (_, i) => ({ key: `camera_${i}` })), frameRate: 6, repeat: -1 });
+            this.anims.create({ key: 'anim_letter', frames: Array.from({length: 6}, (_, i) => ({ key: `letter_${i}` })), frameRate: 6, repeat: -1 });
+
+            let npc_bride_fa = this.add.image(1180, 755, 'bride_fa_sit').setOrigin(0.5, 1).setScale(1.5).setDepth(5); 
+            let npc_bride_mo = this.add.image(1100, 755, 'bride_mo_sit').setOrigin(0.5, 1).setScale(1.5).setDepth(5); 
+            let npc_groom_fa = this.add.image(410, 645, 'groom_fa_sit').setOrigin(0.5, 1).setScale(1.5).setDepth(5); 
+            let npc_groom_mo = this.add.image(490, 645, 'groom_mo_sit').setOrigin(0.5, 1).setScale(1.5).setDepth(5); 
+
+            let npc_GM = this.add.sprite(290, 1085, 'GM_0').setOrigin(0.5, 1).setScale(1.5).setDepth(5).play('anim_GM'); 
+            let npc_spinel = this.add.sprite(1450, 1085, 'spinel_0').setOrigin(0.5, 1).setScale(1.5).setDepth(5).play('anim_spinel'); 
+            let npc_warena = this.add.sprite(650, 1085, 'warena_0').setOrigin(0.5, 1).setScale(1.5).setDepth(5).play('anim_warena'); 
+            
+            let npc_groom = this.add.sprite(1075, 490, 'groom_stand1_0').setOrigin(0.5, 1).setScale(1.5).setDepth(5).play('anim_groom');
+            let npc_bride = this.add.sprite(1160, 490, 'bride_stand1_0').setOrigin(0.5, 1).setScale(1.5).setDepth(5).play('anim_bride');
+            
+            let npc_camera = this.add.sprite(850, 1085, 'camera_0').setOrigin(0, 1).setScale(1.5).setDepth(5).setFlipX(true).play('anim_camera'); 
+            let npc_letter = this.add.sprite(2100, 780, 'letter_0').setOrigin(0.5, 1).setScale(1.5).setDepth(5).setFlipX(true).play('anim_letter'); 
+
+            let bubble_spinel = this.add.image(npc_spinel.x - 20, npc_spinel.y - 115, 'text_spinel').setOrigin(0.5, 1).setDepth(12).setVisible(false);
+            let bubble_warena = this.add.image(npc_warena.x + 20, npc_warena.y - 115, 'text_warena').setOrigin(0.5, 1).setDepth(12).setVisible(false);
+            let bubble_bride_pa = this.add.image(npc_bride_fa.x - 50, npc_bride_fa.y - 100, 'text_bride_pa').setOrigin(0.5, 1).setDepth(12).setVisible(false);
+            let bubble_groom_pa = this.add.image(npc_groom_fa.x + 50, npc_groom_fa.y - 100, 'text_groom_pa').setOrigin(0.5, 1).setDepth(12).setVisible(false);
+            let bubble_camera = this.add.image(npc_camera.x + 60, npc_camera.y - 123, 'text_camera').setOrigin(0.5, 1).setDepth(12).setVisible(false);
+            let bubble_letter = this.add.image(npc_letter.x + 20, npc_letter.y - 115, 'text_letter').setOrigin(0.5, 1).setDepth(12).setVisible(false);
+
+            let bubble_bride_1 = this.add.image(npc_bride.x + 20, npc_bride.y - 115, 'text_bride_1').setOrigin(0.5, 1).setDepth(12).setVisible(false);
+            let bubble_bride_2 = this.add.image(npc_bride.x + 20, npc_bride.y - 115, 'text_bride_2').setOrigin(0.5, 1).setDepth(12).setVisible(false);
+
+            let bubble_groom_1 = this.add.image(npc_groom.x - 20, npc_groom.y - 115, 'text_groom_1').setOrigin(0.5, 1).setDepth(12).setVisible(false);
+            let bubble_groom_2 = this.add.image(npc_groom.x - 20, npc_groom.y - 115, 'text_groom_2').setOrigin(0.5, 1).setDepth(12).setVisible(false);
+
+            let bubble_GM_1 = this.add.image(npc_GM.x + 20, npc_GM.y - 115, 'text_GM_1').setOrigin(0.5, 1).setDepth(12).setVisible(false);
+            let bubble_GM_2 = this.add.image(npc_GM.x + 20, npc_GM.y - 115, 'text_GM_2').setOrigin(0.5, 1).setDepth(12).setVisible(false);
+
+            const allBubbles = [
+                bubble_spinel, bubble_warena, bubble_bride_pa, bubble_groom_pa,
+                bubble_bride_1, bubble_bride_2, bubble_groom_1, bubble_groom_2, bubble_GM_1, bubble_GM_2,
+                bubble_camera, bubble_letter
+            ];
+            allBubbles.forEach(bubble => {
+                if (bubble && bubble.texture) {
+                    bubble.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+                }
+            });
+
+            const pattern1Bubbles = [bubble_spinel, bubble_warena, bubble_bride_pa, bubble_groom_pa, bubble_camera, bubble_letter];
+            pattern1Bubbles.forEach(bubble => {
+                let randomDelay = Phaser.Math.Between(0, 3000); 
+                this.time.delayedCall(randomDelay, () => {
+                    bubble.setVisible(true);
+                    this.time.delayedCall(2000, () => bubble.setVisible(false));
+                    this.time.addEvent({
+                        delay: 4000,
+                        loop: true,
+                        callback: () => {
+                            bubble.setVisible(true);
+                            this.time.delayedCall(2000, () => bubble.setVisible(false));
+                        }
+                    });
+                });
+            });
+
+            const setupRelayTimer = (b1, b2) => {
+                let randomDelay = Phaser.Math.Between(0, 3000); 
+                this.time.delayedCall(randomDelay, () => {
+                    b1.setVisible(true);
+                    this.time.delayedCall(2000, () => {
+                        b1.setVisible(false);
+                        this.time.delayedCall(500, () => {
+                            b2.setVisible(true);
+                            this.time.delayedCall(2000, () => b2.setVisible(false));
+                        });
+                    });
+                    this.time.addEvent({
+                        delay: 7500,
+                        loop: true,
+                        callback: () => {
+                            b1.setVisible(true);
+                            this.time.delayedCall(2000, () => {
+                                b1.setVisible(false);
+                                this.time.delayedCall(500, () => {
+                                    b2.setVisible(true);
+                                    this.time.delayedCall(2000, () => b2.setVisible(false));
+                                });
+                            });
+                        }
+                    });
+                });
+            };
+
+            setupRelayTimer(bubble_bride_1, bubble_bride_2);
+            setupRelayTimer(bubble_groom_1, bubble_groom_2);
+            setupRelayTimer(bubble_GM_1, bubble_GM_2);
+
+            this.add.sprite(120, 418, 'portal_0').setOrigin(0.5, 1).setScale(1.5).play('portal_playing');
+
+            this.anims.create({
+                key: 'hiden_portal_playing',
+                frames: Array.from({ length: 5 }, (_, i) => ({ key: `hiden_portal_${i}` })),
+                frameRate: 6,
+                repeat: -1
+            });
+
+            this.add.sprite(645, 655, 'hiden_portal_0').setOrigin(0.5, 1).setScale(1.5).play('hiden_portal_playing');
+            this.add.sprite(1270, 750, 'hiden_portal_0').setOrigin(0.5, 1).setScale(1.3).play('hiden_portal_playing');
+            this.add.sprite(1815, 1095, 'hiden_portal_0').setOrigin(0.5, 1).setScale(1.3).play('hiden_portal_playing');
+            this.add.sprite(175, 1095, 'hiden_portal_0').setOrigin(0.5, 1).setScale(1.5).play('hiden_portal_playing');
+
+            this.physics.world.setBounds(0, 0, 3016, 1130);
+            this.cameras.main.setBounds(0, 0, 3016, 1245);
+            
+            this.player = this.physics.add.sprite(120, 400, `${this.myChar}_stand1_0`).setScale(1.5).setOrigin(0.5, 1).setCollideWorldBounds(true).setBounce(0).setDepth(10);
+            
+            this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+
+            this.anims.create({ key: `${this.myChar}_jump_up`, frames: [{ key: `${this.myChar}_jump_0` }], frameRate: 1 });
+            this.anims.create({ key: `${this.myChar}_jump_peak`, frames: [{ key: `${this.myChar}_jump_1` }], frameRate: 1 });
+            this.anims.create({ key: `${this.myChar}_prone_anim`, frames: [{ key: `${this.myChar}_prone` }], frameRate: 1 });
+            
+            // 💡 계단용 미세 발판 두께 강화 (높이 2 -> 10)
+            let grounds = [
+                this.add.rectangle(3016/2, 1102, 3016, 20, 0x00ff00, 0),    
+                this.add.rectangle(200, 420, 550, 20, 0x00ff00, 0),
+                this.add.rectangle(235, 510, 60, 20, 0x00ff00, 0),
+                this.add.rectangle(235, 620, 60, 20, 0x00ff00, 0),
+                this.add.rectangle(50, 460, 65, 20, 0x00ff00, 0),
+                this.add.rectangle(50, 570, 65, 20, 0x00ff00, 0),
+                this.add.rectangle(530, 655, 390, 20, 0x00ff00, 0),
+                this.add.rectangle(860, 710, 100, 20, 0x00ff00, 0),
+                this.add.rectangle(1150, 770, 350, 20, 0x00ff00, 0),
+                this.add.rectangle(1400, 790, 5, 10, 0x00ff00, 0),
+                this.add.rectangle(1470, 845, 5, 10, 0x00ff00, 0),
+                this.add.rectangle(2063, 895, 1000, 20, 0x00ff00, 0),
+                this.add.rectangle(1950, 850, 650, 20, 0x00ff00, 0),
+                this.add.rectangle(1980, 795, 600, 20, 0x00ff00, 0),
+                this.add.rectangle(1777.5, 1050, 140, 10, 0x00ff00, 0),
+                this.add.rectangle(1822.5, 995, 140, 10, 0x00ff00, 0),
+                this.add.rectangle(1865, 940, 140, 10, 0x00ff00, 0),
+                this.add.rectangle(2350, 1023, 870, 10, 0x00ff00, 0),
+                this.add.rectangle(2398, 972, 595, 10, 0x00ff00, 0),
+                this.add.rectangle(995, 660, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1060, 630, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1100, 580, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1175, 550, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1240, 535, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1300, 505, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1330, 445, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1335, 390, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1325, 335, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1290, 285, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1220, 255, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1145, 270, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1065, 275, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(990, 270, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(930, 310, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(915, 365, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(910, 415, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(940, 465, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(990, 510, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1055, 545, 3, 10, 0x00ff00, 0),
+                this.add.rectangle(1110, 500, 100, 20, 0x00ff00, 0)
+            ];
+
+            this.currentGround = null;
+            this.mainFloorGround = grounds[0]; 
+
+            grounds.forEach(ground => {
+                this.physics.add.existing(ground, true); 
+                ground.body.checkCollision.down = false;  
+                ground.body.checkCollision.left = false;  
+                ground.body.checkCollision.right = false; 
+                this.physics.add.collider(this.player, ground, () => {
+                    this.currentGround = ground; 
+                }); 
+            });
+            
+            this.cursors = this.input.keyboard.createCursorKeys();
+            this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+            this.controls = { left: false, right: false, up: false, down: false, jumpJustPressed: false };
+            this.isJumping = false;
+            this.isTeleporting = false; 
+            this.isPreparingDownJump = false; 
+            
+            // 💡 코요테 타임을 위한 변수
+            this.lastGroundedTime = 0;
+
+            const btnStyle = { font: '30px Arial', fill: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', padding: {x: 20, y: 20} };
+            
+            let leftBtn = this.add.image(95, 627, 'arrow_0').setAngle(270).setScale(1.75).setInteractive().setScrollFactor(0).setDepth(9999);
+            leftBtn.on('pointerdown', () => this.controls.left = true).on('pointerup', () => this.controls.left = false).on('pointerout', () => this.controls.left = false);
+            
+            let rightBtn = this.add.image(255, 630, 'arrow_0').setAngle(90).setScale(1.75).setInteractive().setScrollFactor(0).setDepth(9999);
+            rightBtn.on('pointerdown', () => this.controls.right = true).on('pointerup', () => this.controls.right = false).on('pointerout', () => this.controls.right = false);
+
+            let upBtn = this.add.image(177, 548, 'arrow_0').setAngle(0).setScale(1.75).setInteractive().setScrollFactor(0).setDepth(9999);
+            upBtn.on('pointerdown', () => this.controls.up = true).on('pointerup', () => this.controls.up = false).on('pointerout', () => this.controls.up = false);
+
+            let downBtn = this.add.image(173, 630, 'arrow_0').setAngle(180).setScale(1.75).setInteractive().setScrollFactor(0).setDepth(9999);
+            downBtn.on('pointerdown', () => this.controls.down = true).on('pointerup', () => this.controls.down = false).on('pointerout', () => this.controls.down = false);
+
+            let jumpBtn = this.add.image(1100, 630, 'jump_key').setScale(0.3).setInteractive().setScrollFactor(0).setDepth(9999);
+            jumpBtn.on('pointerdown', () => this.controls.jumpJustPressed = true).on('pointerup', () => this.controls.jumpJustPressed = false).on('pointerout', () => this.controls.jumpJustPressed = false);
+
+            let npcBtn = this.add.image(1200, 630, 'npc_key').setScale(0.3).setInteractive().setScrollFactor(0).setDepth(9999);
+            downBtn.on('pointerdown', () => this.controls.npc = true).on('pointerup', () => this.controls.npc = false).on('pointerout', () => this.controls.npc = false);
+
+            let soundBtn = this.add.image(1200, 50, this.isSoundOn ? 'sound_on' : 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1).setScrollFactor(0).setDepth(9999);
+
+            let bgm = null;
+
+            if (this.cache.audio.exists('bgm_wedding_village')) {
+                bgm = this.sound.add('bgm_wedding_village', { loop: true, volume: 0 });
+                if (this.isSoundOn) {
+                    bgm.play();
+                    this.tweens.add({ targets: bgm, volume: 0.5, duration: 1000 });
+                }
+            }
+
+            soundBtn.on('pointerdown', (pointer, localX, localY, event) => {
+                if (event) event.stopPropagation();
+                if (!bgm) return; 
+
+                if (bgm.isPlaying && bgm.volume > 0) {
+                    bgm.pause(); 
+                    soundBtn.setTexture('sound_off'); 
+                    this.isSoundOn = false;
+                } else {
+                    if (bgm.isPaused) bgm.resume();
+                    else bgm.play();
+                    bgm.volume = 0.5;
+                    soundBtn.setTexture('sound_on'); 
+                    this.isSoundOn = true;
+                }
+            });
+
+            this.coordText = this.add.text(0, 0, '(0, 0)', {
+                font: '20px Arial',
+                fill: '#ffff00', 
+                backgroundColor: 'rgba(0,0,0,0.7)', 
+                padding: { x: 5, y: 5 }
+            }).setDepth(9999);
+        }
+
+        update() {
+            let pointer = this.input.activePointer;
+            this.coordText.setPosition(pointer.worldX + 15, pointer.worldY + 15);
+            this.coordText.setText(`(${Math.round(pointer.worldX)}, ${Math.round(pointer.worldY)})`);
+
+            let moveLeft = this.controls.left || this.cursors.left.isDown;
+            let moveRight = this.controls.right || this.cursors.right.isDown;
+            let moveUp = this.controls.up || this.cursors.up.isDown;
+            let moveDown = this.controls.down || this.cursors.down.isDown;
+            let jumpPressed = Phaser.Input.Keyboard.JustDown(this.spaceKey) || this.controls.jumpJustPressed;
+            
+            this.controls.jumpJustPressed = false;
+
+            // 💡 코요테 타임 (0.1초의 여유) 적용: 물리 엔진 떨림 무시
+            if (this.player.body.blocked.down) {
+                this.isJumping = false;
+                this.lastGroundedTime = this.time.now;
+            }
+
+            // 바닥에 닿은 지 100ms(0.1초) 이내이고 점프 중이 아니라면 바닥에 있는 것으로 인정
+            let isGrounded = (this.time.now - this.lastGroundedTime) <= 100 && !this.isJumping;
+
+            if (!isGrounded) {
+                this.currentGround = null; // 완전히 공중에 떠있을 때만 바닥 초기화
+            }
+
+            if (this.isPreparingDownJump) {
+                this.player.setVelocityX(0);
+                this.player.anims.play(`${this.myChar}_prone_anim`, true);
+                return;
+            }
+
+            if (moveLeft && !moveDown) { 
+                this.player.setVelocityX(-198).setFlipX(false); 
+            } else if (moveRight && !moveDown) { 
+                this.player.setVelocityX(198).setFlipX(true); 
+            } else { 
+                this.player.setVelocityX(0); 
+            }
+
+            // 💡 물리엔진 변수 대신 새로 만든 여유 변수(isGrounded)로 점프 가능 판별
+            if (jumpPressed && isGrounded) {
+                if (moveDown) {
+                    // 아래키와 점프키가 동시에 눌렸을 때만 아래로 통과
+                    if (this.currentGround && this.currentGround !== this.mainFloorGround) {
+                        this.isPreparingDownJump = true;
+                        this.player.setVelocityX(0);
+                        this.player.anims.play(`${this.myChar}_prone_anim`, true);
+                        this.time.delayedCall(500, () => {
+                            this.isPreparingDownJump = false;
+                            let target = this.currentGround;
+                            if (target) target.body.checkCollision.up = false;
+                            this.player.setVelocityY(150);
+                            this.time.delayedCall(400, () => { if (target) target.body.checkCollision.up = true; });
+                        });
+                    }
+                } else {
+                    // 일반 점프
+                    this.player.setVelocityY(-550); // 중력 900에 최적화된 점프값
+                    this.sound.play('bgm_jump');
+                    this.isJumping = true;
+                    this.lastGroundedTime = 0;
+                }
+            }
+
+            if (moveUp && !this.isTeleporting) {
+                if (Phaser.Math.Distance.Between(this.player.x, this.player.y, 120, 418) < 50) {
+                    this.isTeleporting = true;
+                    this.sound.play('bgm_portal'); 
+                    this.cameras.main.fadeOut(1000, 0, 0, 0);
+                    this.cameras.main.once('camerafadeoutcomplete', () => {
+                        this.game.sound.stopAll(); 
+                        this.scene.start('SelectScene');
+                    });
+                }
+                else if (Phaser.Math.Distance.Between(this.player.x, this.player.y, 645, 655) < 50) {
+                    this.executeTeleport(175, 1095);
+                }
+                else if (Phaser.Math.Distance.Between(this.player.x, this.player.y, 175, 1095) < 50) {
+                    this.executeTeleport(645, 655);
+                }
+                else if (Phaser.Math.Distance.Between(this.player.x, this.player.y, 1270, 750) < 50) {
+                    this.executeTeleport(1815, 1095);
+                }
+                else if (Phaser.Math.Distance.Between(this.player.x, this.player.y, 1815, 1095) < 50) {
+                    this.executeTeleport(1270, 750);
+                }
+            }
+
+            // 💡 애니메이션 출력도 isGrounded 변수를 기반으로 판별
+            if (!isGrounded) {
+                if (Math.abs(this.player.body.velocity.y) < 50) { 
+                    this.player.anims.play(`${this.myChar}_jump_peak`, true); 
+                } else { 
+                    this.player.anims.play(`${this.myChar}_jump_up`, true); 
+                }
+            } else {
+                if (moveDown) {
+                    this.player.anims.play(`${this.myChar}_prone_anim`, true);
+                } else if (moveLeft || moveRight) { 
+                    this.player.anims.play(`${this.myChar}_walking`, true); 
+                } else { 
+                    this.player.anims.play(`${this.myChar}_breathing`, true); 
+                }
+            }
+        }
+
+        executeTeleport(targetX, targetY) {
+            this.isTeleporting = true; 
+            this.sound.play('bgm_tel'); 
+            
+            this.player.setVelocityY(0); 
+            this.player.setPosition(targetX, targetY - 10); 
+            
+            this.time.delayedCall(300, () => { this.isTeleporting = false; });
+        }
+    }
+
+    const config = { 
+        type: Phaser.AUTO, 
+        width: 1280, 
+        height: 720, 
+        parent: 'game-container', 
+        render: { 
+            pixelArt: true,
+            roundPixels: true 
+        },
+        physics: { 
+            default: 'arcade', 
+            arcade: { 
+                gravity: { y: 1200 }
+                // 💡 roundPixels: true 옵션을 제거하여 1픽셀 오차 진동 현상 방지
+            } 
+        }, 
+        input: {
+            activePointers: 3 
+        },
+        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }, 
+        scene: [StartScene, SelectScene, VillageScene] 
+    };
+    new Phaser.Game(config);
+</script>
+</body>
+</html>
+
+
+
+
