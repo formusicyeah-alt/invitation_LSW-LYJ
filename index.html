@@ -6,8 +6,11 @@
     <title>이승원,이유진 결혼합니다.</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background-color: #000; }
-        #game-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; z-index: 1; }
+        /* 💡 모바일 브라우저의 100vh는 주소창 영역까지 포함해서 계산되는 경우가 많아,
+           세로화면에서 콘텐츠가 화면 정중앙보다 아래로 밀려 보이는 원인이 되곤 합니다.
+           지원하는 브라우저에서는 100dvh(주소창 변화에 반응하는 실제 보이는 높이)를 우선 사용합니다. */
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; background-color: #000; }
+        #game-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; display: flex; justify-content: center; align-items: center; z-index: 1; }
         #portrait-warning { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #ffffff; color: #000000; display: none; justify-content: center; align-items: center; z-index: 9999; text-align: center; font-family: "Arial", sans-serif; }
         /* 💡 세로화면이어도 무조건 뜨던 기존 미디어쿼리는 제거. 이제부터는 JS가 상황(인트로 전/후)에 맞춰 .active 클래스를 붙여줄 때만 표시됨 */
         #portrait-warning.active { display: flex; }
@@ -102,7 +105,22 @@
         }
         create() {
             this.anims.create({ key: 'invit_playing', frames: Array.from({length:21}, (_,i)=>({key:`invit_${i}`})), frameRate: 12, repeat: -1 });
-            this.add.sprite(640, 800, 'invit_0').setScale(4).play('invit_playing').setInteractive().on('pointerup', () => {
+
+            // =========================================================================
+            // 📐 인트로(invit_$) 이미지의 위치(x, y)와 크기(scale)를 가로/세로 화면별로 따로 지정합니다.
+            //  - x, y는 게임 내부 좌표 기준 (가로 1280 x 세로 720 이라고 생각하면 됩니다)
+            //    · x: 0(맨 왼쪽) ~ 1280(맨 오른쪽), 640이 정중앙
+            //    · y: 0(맨 위) ~ 720(맨 아래), 360이 정중앙
+            //  - scale은 원본 이미지 크기의 배수입니다 (2 = 2배, 4 = 4배 ...)
+            //  - 나중에 위치/크기를 조절하고 싶으면 아래 숫자만 바꾸면 됩니다!
+            // =========================================================================
+            const isPortrait = window.innerHeight > window.innerWidth;
+
+            const invitLayout = isPortrait
+                ? { x: 640, y: 360, scale: 4 } // 📱 세로화면(스마트폰): 화면 정중앙 + 기존보다 2배 크게(2→4)
+                : { x: 640, y: 360, scale: 2 }; // 💻 가로화면(컴퓨터 등): 기존 그대로 유지
+
+            this.add.sprite(invitLayout.x, invitLayout.y, 'invit_0').setScale(invitLayout.scale).play('invit_playing').setInteractive().on('pointerup', () => {
                 enterLandscapeExperience(this.scale); // 전체화면 + 가로 고정 시도 + 이후 회전 안내 활성화
 
                 this.cameras.main.fadeOut(1000, 0, 0, 0);
