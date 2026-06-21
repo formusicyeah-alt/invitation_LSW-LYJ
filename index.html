@@ -117,7 +117,7 @@
             const isPortrait = window.innerHeight > window.innerWidth;
 
             const invitLayout = isPortrait
-                ? { x: 640, y: 360, scale: 4 } // 📱 세로화면(스마트폰): 화면 정중앙 + 기존보다 2배 크게(2→4)
+                ? { x: 360, y: 640, scale: 4 } // 📱 세로화면(스마트폰): 화면 정중앙 + 기존보다 2배 크게(2→4)
                 : { x: 640, y: 360, scale: 2 }; // 💻 가로화면(컴퓨터 등): 기존 그대로 유지
 
             this.add.sprite(invitLayout.x, invitLayout.y, 'invit_0').setScale(invitLayout.scale).play('invit_playing').setInteractive().on('pointerup', () => {
