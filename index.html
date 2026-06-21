@@ -117,7 +117,7 @@
             const isPortrait = window.innerHeight > window.innerWidth;
 
             const invitLayout = isPortrait
-                ? { x: 640, y: 100, scale: 4 } // 📱 세로화면(스마트폰): 화면 정중앙 + 기존보다 2배 크게(2→4)
+                ? { x: 640, y: 200, scale: 4 } // 📱 세로화면(스마트폰): 사용자 확정값 (x:640, y:200), 기존보다 2배 크게(2→4)
                 : { x: 640, y: 360, scale: 2 }; // 💻 가로화면(컴퓨터 등): 기존 그대로 유지
 
             this.add.sprite(invitLayout.x, invitLayout.y, 'invit_0').setScale(invitLayout.scale).play('invit_playing').setInteractive().on('pointerup', () => {
@@ -253,6 +253,15 @@
             this.load.image('text_groom_2', 'images/text_groom_2.png');
             this.load.image('text_GM_1', 'images/text_GM_1.png');
             this.load.image('text_GM_2', 'images/text_GM_2.png');
+
+            // 💬 NPC 대화창 관련 이미지
+            //  - 대화창은 NPC마다 다른 이미지를 쓰므로, NPC를 추가할 때마다 여기에 load 한 줄씩 추가하면 됩니다.
+            //    예) this.load.image('chat_page_bride_fa', 'images/chat_page_bride_fa.png');
+            this.load.image('chat_page_groom_fa', 'images/chat_page_groom_fa.png'); // 신랑 아버지 NPC의 대화창 이미지
+            this.load.image('chat_page_bride', 'images/chat_page_bride.png'); // 신랑 아버지 NPC의 대화창 이미지
+            this.load.image('chat_page_warena', 'images/chat_page_warena.png'); // 워레나(축의금 계좌번호 안내) NPC의 대화창 이미지
+            this.load.image('chat_page_spinel', 'images/chat_page_spinel.png'); // 스피넬(예식장 위치 안내) NPC의 대화창 이미지
+            this.load.image('check_exit', 'images/check_exit.png'); // 대화창 닫기(X) 버튼 이미지 (모든 NPC 공용)
         }
 
         create() {
@@ -472,7 +481,9 @@
             jumpBtn.on('pointerdown', () => this.controls.jumpJustPressed = true).on('pointerup', () => this.controls.jumpJustPressed = false).on('pointerout', () => this.controls.jumpJustPressed = false);
 
             let npcBtn = this.add.image(1200, 630, 'npc_key').setScale(0.3).setInteractive().setScrollFactor(0).setDepth(9999);
-            downBtn.on('pointerdown', () => this.controls.npc = true).on('pointerup', () => this.controls.npc = false).on('pointerout', () => this.controls.npc = false);
+            // 💬 NPC 버튼: 누르는 즉시(누르고 있는 동안 X) "근처에 있는 NPC와 대화 시도"를 실행한다.
+            //    (기존 코드에 npcBtn이 아니라 downBtn에 잘못 연결되어 있던 버그를 같이 수정했습니다)
+            npcBtn.on('pointerdown', () => this.tryOpenNearestChat());
 
             let soundBtn = this.add.image(1200, 50, this.isSoundOn ? 'sound_on' : 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1).setScrollFactor(0).setDepth(9999);
 
@@ -503,8 +514,206 @@
                 }
             });
 
+            // =================================================================
+            // 💬 NPC 대화 시스템
+            //  - this.chatNpcs 배열에 "대화 가능한 NPC" 정보를 등록해두면, NPC버튼을 누르거나
+            //    NPC를 직접 클릭(터치)했을 때 가까운 NPC와의 대화창이 자동으로 열립니다.
+            //
+            //  ✅ 새 NPC에게 대화 기능을 추가하고 싶다면 딱 3단계만 하면 됩니다:
+            //    1) preload()에 그 NPC의 대화창 이미지를 load
+            //       예) this.load.image('chat_page_bride_fa', 'images/chat_page_bride_fa.png');
+            //    2) 아래 this.chatNpcs 배열에 한 줄 추가
+            //       예) { npc: npc_bride_fa, chatImageKey: 'chat_page_bride_fa' },
+            //    3) makeNpcClickable(그 NPC); 한 줄 추가 (NPC 직접 클릭도 가능하게 하려면)
+            //  대화창 표시/닫기 로직 자체는 모든 NPC가 공통으로 재사용합니다.
+            //  (지금은 "이미지 1장짜리" 단순 대화창 NPC만 지원. 페이지 넘기기/링크 이동 같은
+            //   추가 기능이 있는 NPC는 나중에 별도로 확장하면 됩니다)
+            // =================================================================
+
+            // =================================================================
+            // 💰 워레나(축의금 계좌번호 안내) 설정
+            //  - ACCOUNTS: 측별 이름과 계좌번호. 번호만 바꾸고 싶으면 여기 숫자만 수정하세요.
+            //  - WARENA_TEXT_LAYOUT: 각 줄이 화면에 표시될 좌표(x, y). ACCOUNTS와 같은 순서로
+            //    1:1 대응됩니다. 지금은 대화창 중앙(640, 360)을 기준으로 세로로 살짝 펼쳐뒀어요.
+            //    원하는 위치로 자유롭게 옮기세요 (전부 같은 좌표로 둬도 됩니다).
+            // =================================================================
+            const ACCOUNTS = [
+                { label: '신랑 이승원',      number: 'IBK기업 010-26293856' },
+                { label: '신부 이유진',      number: '신한 110-479-904-716' },
+                { label: '신랑 혼주 이효근', number: '하나 220-043-96100108' },
+                { label: '신랑 혼주 유금순', number: '신한 110-317-873019' },
+                { label: '신부 혼주 이동수', number: '우체국 102459-02-059840' },
+                { label: '신부 혼주 심순옥', number: 'KB국민 244-24-0091-251' },
+            ];
+
+            // ACCOUNTS 배열과 순서가 1:1로 맞아야 합니다 (1번째 좌표 = 1번째 계좌, ...)
+            const WARENA_TEXT_LAYOUT = [
+                { x: 633, y: 320 },
+                { x: 627, y: 355 },
+                { x: 662, y: 390 },
+                { x: 647, y: 425 },
+                { x: 671, y: 460 },
+                { x: 667, y: 495 },
+            ];
+
+            // 대화창을 열 때 호출되어, 계좌번호 텍스트들을 만들어 반환한다.
+            // (반환된 텍스트들은 closeChat() 시점에 자동으로 전부 제거됨)
+            this.buildWarenaAccounts = () => {
+                return ACCOUNTS.map((account, i) => {
+                    const pos = WARENA_TEXT_LAYOUT[i];
+                    const text = this.add.text(pos.x, pos.y, `${account.label} : ${account.number}`, {
+                        font: '25px Arial',
+                        fill: '#000000',
+                        backgroundColor: 'rgba(255,255,255,0.6)',
+                        padding: { x: 6, y: 3 },
+                    })
+                        .setOrigin(0.5, 0.5)     // 좌표의 중심을 기준으로 텍스트가 놓이도록
+                        .setScrollFactor(0)        // 화면에 고정 (대화창과 같은 방식)
+                        .setDepth(20002)           // 대화창 이미지(20000)보다 위에 보이도록
+                        .setInteractive({ useHandCursor: true });
+
+                    // 클릭하면 계좌번호를 클립보드에 복사하고, 0.8초간 "복사완료!"로 표시해 피드백을 준다
+                    text.on('pointerdown', () => {
+                        navigator.clipboard.writeText(account.number).then(() => {
+                            text.setText('복사완료!');
+                            this.time.delayedCall(800, () => text.setText(`${account.label} : ${account.number}`));
+                        }).catch(() => {
+                            console.warn('클립보드 복사 실패: 브라우저가 지원하지 않거나 권한이 없습니다.');
+                        });
+                    });
+
+                    return text;
+                });
+            };
+
+            // =================================================================
+            // 📍 스피넬(예식장 위치 안내) 설정
+            //  - WEDDING_HALL_MAP_URL: 클릭 시 열릴 지도 링크. 네이버지도/카카오맵 등 실제 링크로 바꾸세요.
+            //  - SPINEL_TEXT_LAYOUT: 링크 텍스트가 표시될 좌표(x, y). 자유롭게 옮기세요.
+            // =================================================================
+            const WEDDING_HALL_MAP_URL = 'https://buly.kr/DwGSojz'; // ⚠️ 실제 예식장 지도 링크로 교체하세요
+            const SPINEL_TEXT_LAYOUT = { x: 850, y: 400 };
+
+            // 대화창을 열 때 호출되어, 클릭 가능한 지도 링크 텍스트를 만들어 반환한다.
+            this.buildSpinelMapLink = () => {
+                const text = this.add.text(SPINEL_TEXT_LAYOUT.x, SPINEL_TEXT_LAYOUT.y, WEDDING_HALL_MAP_URL, {
+                    font: '30px Arial',
+                    fill: '#0033cc',
+                    backgroundColor: 'rgba(255,255,255,0.6)',
+                    padding: { x: 6, y: 3 },
+                })
+                    .setOrigin(0.5, 0.5)
+                    .setScrollFactor(0)
+                    .setDepth(20002)
+                    .setInteractive({ useHandCursor: true });
+
+                // 클릭하면 새 탭으로 지도 링크를 연다
+                text.on('pointerdown', () => {
+                    window.open(WEDDING_HALL_MAP_URL, '_blank');
+                });
+
+                return [text];
+            };
+
+            // 대화 가능한 NPC 목록
+            //  - chatImageKey: 대화창 이미지
+            //  - buildExtras(선택): 이미지 위에 추가로 올릴 클릭 가능한 텍스트 등을 만드는 함수.
+            //    단순 이미지 1장짜리 대화창이라면 buildExtras 없이 등록하면 됩니다.
+            this.chatNpcs = [
+                { npc: npc_groom_fa, chatImageKey: 'chat_page_groom_fa' },
+                { npc: npc_bride, chatImageKey: 'chat_page_bride' },
+                { npc: npc_warena, chatImageKey: 'chat_page_warena', buildExtras: () => this.buildWarenaAccounts() },
+                { npc: npc_spinel, chatImageKey: 'chat_page_spinel', buildExtras: () => this.buildSpinelMapLink() },
+            ];
+
+            // NPC 상하좌우 기준 80 이내에 플레이어가 있는지 확인 (원형 거리가 아니라 x/y축 각각 비교)
+            const NPC_INTERACT_RANGE = 80;
+            const isNearNpc = (npc) => {
+                return Math.abs(this.player.x - npc.x) <= NPC_INTERACT_RANGE &&
+                       Math.abs(this.player.y - npc.y) <= NPC_INTERACT_RANGE;
+            };
+
+            // 대화창(팝업) 이미지 + 닫기(X) 버튼은 미리 1세트만 만들어두고, 대화할 때마다
+            // 텍스처(이미지)만 바꿔 끼워서 재사용한다 (NPC마다 새로 만들지 않음)
+            const CHAT_POPUP_SCALE = 0.4; // 모든 NPC 대화창에 공통으로 적용될 크기 배수 - 여기 숫자만 바꾸면 전체 반영됨
+            
+            this.chatPopupImage = this.add.image(640, 360, 'chat_page_groom_fa')
+                .setScale(CHAT_POPUP_SCALE)
+                .setOrigin(0.5, 0.5)    // 중심 기준으로 정렬해야 "화면 정중앙"에 놓기 편함
+                .setScrollFactor(0)      // 카메라(맵)가 움직여도 화면에 고정되도록
+                .setDepth(20000)     // 다른 모든 요소(UI 포함)보다 위에 보이도록 최상단 depth
+                .setVisible(false);
+
+            this.chatExitButton = this.add.image(0, 0, 'check_exit')
+                .setOrigin(0.7, 0)         // 오른쪽-위 모서리를 기준점으로 → "대화창의 가장 오른쪽 위"에 놓기 쉬워짐
+                .setScrollFactor(0)
+                .setDepth(20001)         // 대화창 이미지보다 한 단계 더 위 (가려지지 않도록)
+                .setInteractive({ useHandCursor: true })
+                .setScale(1.5)      // 크기 조절
+                .setVisible(false);
+
+            // 닫기(X) 버튼을 누르면 대화창 닫기
+            this.chatExitButton.on('pointerdown', () => this.closeChat());
+
+            // 현재 열려있는 대화의 "추가 요소"들(계좌번호 텍스트, 지도 링크 등)을 보관해두는 배열
+            // → closeChat()에서 이 배열에 든 것들을 전부 제거(destroy)한다.
+            this.chatExtraObjects = [];
+
+            // NPC와의 대화창을 연다 (entry: this.chatNpcs 배열의 항목 하나)
+            this.openChat = (entry) => {
+                this.isChatOpen = true; // 대화 중에는 캐릭터 이동/점프를 막는다 (update()에서 이 플래그를 체크함)
+
+                this.chatPopupImage.setTexture(entry.chatImageKey).setPosition(640, 360).setVisible(true);
+
+                // 닫기 버튼을 "대화창 이미지의 가장 오른쪽 위"로 자동 배치
+                //  displayWidth/displayHeight = 화면에 실제로 보이는 크기 (이미지에 scale을 줬다면 그것까지 반영된 값)
+                const popupRightEdge = this.chatPopupImage.x + this.chatPopupImage.displayWidth / 2;
+                const popupTopEdge = this.chatPopupImage.y - this.chatPopupImage.displayHeight / 2;
+                this.chatExitButton.setPosition(popupRightEdge, popupTopEdge).setVisible(true);
+
+                // 이 NPC만의 추가 요소(계좌번호 텍스트, 지도 링크 등)가 있다면 생성해서 화면에 올린다
+                this.chatExtraObjects = entry.buildExtras ? entry.buildExtras() : [];
+
+                this.player.setVelocityX(0); // 대화 시작 시 캐릭터를 제자리에 멈춰 세움
+            };
+
+            // 대화창을 닫고 원래 웨딩빌리지 화면으로 되돌린다
+            this.closeChat = () => {
+                this.isChatOpen = false;
+                this.chatPopupImage.setVisible(false);
+                this.chatExitButton.setVisible(false);
+
+                // 이번 대화에서 추가로 만들었던 요소(계좌번호 텍스트 등)들을 전부 제거
+                this.chatExtraObjects.forEach(obj => obj.destroy());
+                this.chatExtraObjects = [];
+            };
+
+            // "근처에 있는 NPC" 중 한 명과의 대화를 시도한다 (NPC버튼을 눌렀을 때 호출)
+            this.tryOpenNearestChat = () => {
+                if (this.isChatOpen) return; // 이미 대화 중이면 무시
+                const target = this.chatNpcs.find(entry => isNearNpc(entry.npc));
+                if (target) this.openChat(target);
+            };
+
+            // NPC를 직접 클릭(터치)했을 때도 대화가 열리도록 만들어주는 함수.
+            // 단, 멀리서 클릭하면 무시되고 "가까이 있을 때만" 열린다.
+            const makeNpcClickable = (npc) => {
+                npc.setInteractive({ useHandCursor: true });
+                npc.on('pointerdown', () => {
+                    if (this.isChatOpen) return;
+                    const entry = this.chatNpcs.find(e => e.npc === npc);
+                    if (entry && isNearNpc(npc)) this.openChat(entry);
+                });
+            };
+
+            // 클릭으로도 대화 가능하게 설정 (대화 가능한 NPC를 늘릴 때마다 한 줄씩 추가)
+            makeNpcClickable(npc_groom_fa);
+            makeNpcClickable(npc_bride);
+            makeNpcClickable(npc_warena);
+            makeNpcClickable(npc_spinel);
+
             this.coordText = this.add.text(0, 0, '(0, 0)', {
-                font: '20px Arial',
+                font: '30px Arial',
                 fill: '#ffff00', 
                 backgroundColor: 'rgba(0,0,0,0.7)', 
                 padding: { x: 5, y: 5 }
@@ -515,6 +724,13 @@
             let pointer = this.input.activePointer;
             this.coordText.setPosition(pointer.worldX + 15, pointer.worldY + 15);
             this.coordText.setText(`(${Math.round(pointer.worldX)}, ${Math.round(pointer.worldY)})`);
+
+            // 💬 대화창이 열려있는 동안은 캐릭터 이동/점프를 전부 멈춘다 (대화에만 집중)
+            if (this.isChatOpen) {
+                Phaser.Input.Keyboard.JustDown(this.spaceKey); // 대화 중 눌린 점프 입력은 버려서, 대화 종료 직후 점프가 튀어나가지 않게 함
+                this.player.setVelocityX(0);
+                return;
+            }
 
             let moveLeft = this.controls.left || this.cursors.left.isDown;
             let moveRight = this.controls.right || this.cursors.right.isDown;
