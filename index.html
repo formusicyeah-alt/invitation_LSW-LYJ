@@ -102,7 +102,7 @@
         }
         create() {
             this.anims.create({ key: 'invit_playing', frames: Array.from({length:21}, (_,i)=>({key:`invit_${i}`})), frameRate: 12, repeat: -1 });
-            this.add.sprite(640, 360, 'invit_0').setScale(2).play('invit_playing').setInteractive().on('pointerup', () => {
+            this.add.sprite(640, 800, 'invit_0').setScale(4).play('invit_playing').setInteractive().on('pointerup', () => {
                 enterLandscapeExperience(this.scale); // 전체화면 + 가로 고정 시도 + 이후 회전 안내 활성화
 
                 this.cameras.main.fadeOut(1000, 0, 0, 0);
