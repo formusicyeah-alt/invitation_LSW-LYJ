@@ -257,12 +257,19 @@
             // 💬 NPC 대화창 관련 이미지
             //  - 대화창은 NPC마다 다른 이미지를 쓰므로, NPC를 추가할 때마다 여기에 load 한 줄씩 추가하면 됩니다.
             //    예) this.load.image('chat_page_bride_fa', 'images/chat_page_bride_fa.png');
-            this.load.image('chat_page_groom_fa', 'images/chat_page_groom_fa.png'); // 신랑 아버지, 혼주 NPC의 대화창 이미지
+            this.load.image('chat_page_groom_fa', 'images/chat_page_groom_fa.png'); // 신랑 아버지 NPC의 대화창 이미지
             this.load.image('chat_page_bride', 'images/chat_page_bride.png'); // 신부 NPC의 대화창 이미지
-            this.load.image('chat_page_bride_fa', 'images/chat_page_bride_fa.png'); // 신부 NPC의 대화창 이미지
             this.load.image('chat_page_warena', 'images/chat_page_warena.png'); // 워레나(축의금 계좌번호 안내) NPC의 대화창 이미지
             this.load.image('chat_page_spinel', 'images/chat_page_spinel.png'); // 스피넬(예식장 위치 안내) NPC의 대화창 이미지
             this.load.image('check_exit', 'images/check_exit.png'); // 대화창 닫기(X) 버튼 이미지 (모든 NPC 공용)
+
+            // 👑 운영자(GM) NPC 대화창 이미지 - 메인 메뉴 1장 + 메뉴 선택 시 보여줄 하위 페이지 5장
+            this.load.image('chat_page_GM', 'images/chat_page_GM.png');     // GM 대화 시작 시 보이는 메인 메뉴 이미지
+            this.load.image('chat_page_GM_1', 'images/chat_page_GM_1.png'); // 1. 신랑, 신부, 혼주
+            this.load.image('chat_page_GM_2', 'images/chat_page_GM_2.png'); // 2. 축의 정보
+            this.load.image('chat_page_GM_3', 'images/chat_page_GM_3.png'); // 3. 결혼식장 위치
+            this.load.image('chat_page_GM_4', 'images/chat_page_GM_4.png'); // 4. 웨딩 촬영 사진
+            this.load.image('chat_page_GM_5', 'images/chat_page_GM_5.png'); // 5. 우체통
         }
 
         create() {
@@ -483,7 +490,6 @@
 
             let npcBtn = this.add.image(1200, 630, 'npc_key').setScale(0.3).setInteractive().setScrollFactor(0).setDepth(9999);
             // 💬 NPC 버튼: 누르는 즉시(누르고 있는 동안 X) "근처에 있는 NPC와 대화 시도"를 실행한다.
-            //    (기존 코드에 npcBtn이 아니라 downBtn에 잘못 연결되어 있던 버그를 같이 수정했습니다)
             npcBtn.on('pointerdown', () => this.tryOpenNearestChat());
 
             let soundBtn = this.add.image(1200, 50, this.isSoundOn ? 'sound_on' : 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1).setScrollFactor(0).setDepth(9999);
@@ -520,15 +526,15 @@
             //  - this.chatNpcs 배열에 "대화 가능한 NPC" 정보를 등록해두면, NPC버튼을 누르거나
             //    NPC를 직접 클릭(터치)했을 때 가까운 NPC와의 대화창이 자동으로 열립니다.
             //
-            //  ✅ 새 NPC에게 대화 기능을 추가하고 싶다면 딱 3단계만 하면 됩니다:
+            //  ✅ 새 NPC에게 "이미지 1장짜리" 단순 대화 기능을 추가하고 싶다면 딱 3단계만 하면 됩니다:
             //    1) preload()에 그 NPC의 대화창 이미지를 load
-            //       예) this.load.image('chat_page_bride_fa', 'images/chat_page_bride_fa.png');
             //    2) 아래 this.chatNpcs 배열에 한 줄 추가
             //       예) { npc: npc_bride_fa, chatImageKey: 'chat_page_bride_fa' },
             //    3) makeNpcClickable(그 NPC); 한 줄 추가 (NPC 직접 클릭도 가능하게 하려면)
-            //  대화창 표시/닫기 로직 자체는 모든 NPC가 공통으로 재사용합니다.
-            //  (지금은 "이미지 1장짜리" 단순 대화창 NPC만 지원. 페이지 넘기기/링크 이동 같은
-            //   추가 기능이 있는 NPC는 나중에 별도로 확장하면 됩니다)
+            //
+            //  ✅ "메뉴 선택 → 다른 대화창으로 전환" 같은 NPC(예: 운영자 GM)는 buildExtras에서
+            //    클릭 가능한 텍스트를 만들고, 그 텍스트의 클릭 핸들러 안에서 this.setChatPage(...)를
+            //    호출해 다른 이미지로 바꿔주면 됩니다. (아래 GM 설정 참고)
             // =================================================================
 
             // =================================================================
@@ -616,6 +622,57 @@
                 return [text];
             };
 
+            // =================================================================
+            // 👑 운영자(GM) 메뉴 설정
+            //  - GM_MENU_ITEMS: 메뉴에 보일 텍스트와, 클릭했을 때 전환할 대화창 이미지 키.
+            //    순서를 바꾸거나 문구를 바꾸고 싶으면 label만 수정하면 됩니다.
+            //  - GM_MENU_TEXT_LAYOUT: 각 줄의 좌표(x, y). GM_MENU_ITEMS와 1:1로 대응됩니다.
+            //    요청하신 대로 "왼쪽 정렬"이 되도록, 아래 buildGMMenu에서 텍스트 기준점을
+            //    setOrigin(0, 0.5)로 설정했습니다 → 그래서 같은 x값을 쓰면 왼쪽 줄이 자동으로 맞춰집니다.
+            // =================================================================
+            const GM_MENU_ITEMS = [
+                { label: '1. 신랑, 신부, 혼주', pageKey: 'chat_page_GM_1' },
+                { label: '2. 축의 정보',        pageKey: 'chat_page_GM_2' },
+                { label: '3. 결혼식장 위치',     pageKey: 'chat_page_GM_3' },
+                { label: '4. 웨딩 촬영 사진',     pageKey: 'chat_page_GM_4' },
+                { label: '5. 우체통',            pageKey: 'chat_page_GM_5' },
+            ];
+
+            // GM_MENU_ITEMS와 순서가 1:1로 맞아야 합니다 (1번째 좌표 = 1번째 메뉴, ...)
+            // 모든 줄의 x값을 같게 두면 왼쪽 줄이 자동으로 맞춰집니다 (왼쪽 정렬).
+            const GM_MENU_TEXT_LAYOUT = [
+                { x: 560, y: 300 },
+                { x: 560, y: 335 },
+                { x: 560, y: 370 },
+                { x: 560, y: 405 },
+                { x: 560, y: 440 },
+            ];
+
+            // GM의 메인 메뉴(대화창을 열었을 때 보이는 선택 텍스트들)를 만들어 반환한다.
+            // 각 텍스트를 클릭하면 this.setChatPage(...)로 그 메뉴에 해당하는 대화창 이미지로 바뀐다.
+            this.buildGMMenu = () => {
+                return GM_MENU_ITEMS.map((item, i) => {
+                    const pos = GM_MENU_TEXT_LAYOUT[i];
+                    const text = this.add.text(pos.x, pos.y, item.label, {
+                        font: '26px Arial',
+                        fill: '#000000',
+                        backgroundColor: 'rgba(255,255,255,0.6)',
+                        padding: { x: 6, y: 3 },
+                    })
+                        .setOrigin(0, 0.5)        // 💡 왼쪽 기준 정렬 (x좌표가 텍스트의 "왼쪽 끝"이 됨)
+                        .setScrollFactor(0)
+                        .setDepth(20002)
+                        .setInteractive({ useHandCursor: true });
+
+                    // 메뉴 텍스트를 클릭하면, 해당하는 하위 대화창 이미지로 전환한다 (추가 요소는 없음 → 빈 배열)
+                    text.on('pointerdown', () => {
+                        this.setChatPage(item.pageKey, []);
+                    });
+
+                    return text;
+                });
+            };
+
             // 대화 가능한 NPC 목록
             //  - chatImageKey: 대화창 이미지
             //  - buildExtras(선택): 이미지 위에 추가로 올릴 클릭 가능한 텍스트 등을 만드는 함수.
@@ -623,13 +680,13 @@
             this.chatNpcs = [
                 { npc: npc_groom_fa, chatImageKey: 'chat_page_groom_fa' },
                 { npc: npc_bride, chatImageKey: 'chat_page_bride' },
-                { npc: npc_bride_fa, chatImageKey: 'chat_page_bride_fa' },
                 { npc: npc_warena, chatImageKey: 'chat_page_warena', buildExtras: () => this.buildWarenaAccounts() },
                 { npc: npc_spinel, chatImageKey: 'chat_page_spinel', buildExtras: () => this.buildSpinelMapLink() },
+                { npc: npc_GM, chatImageKey: 'chat_page_GM', buildExtras: () => this.buildGMMenu() },
             ];
 
             // NPC 상하좌우 기준 80 이내에 플레이어가 있는지 확인 (원형 거리가 아니라 x/y축 각각 비교)
-            const NPC_INTERACT_RANGE = 100;
+            const NPC_INTERACT_RANGE = 80;
             const isNearNpc = (npc) => {
                 return Math.abs(this.player.x - npc.x) <= NPC_INTERACT_RANGE &&
                        Math.abs(this.player.y - npc.y) <= NPC_INTERACT_RANGE;
@@ -654,27 +711,40 @@
                 .setScale(1.5)      // 크기 조절
                 .setVisible(false);
 
-            // 닫기(X) 버튼을 누르면 대화창 닫기
+            // 닫기(X) 버튼을 누르면 대화창 닫기 (메뉴든 하위 페이지든 어디서 누르든 전체 대화가 종료됨)
             this.chatExitButton.on('pointerdown', () => this.closeChat());
 
-            // 현재 열려있는 대화의 "추가 요소"들(계좌번호 텍스트, 지도 링크 등)을 보관해두는 배열
-            // → closeChat()에서 이 배열에 든 것들을 전부 제거(destroy)한다.
+            // 현재 열려있는 대화의 "추가 요소"들(계좌번호 텍스트, 메뉴 텍스트, 지도 링크 등)을 보관해두는 배열
+            // → 페이지가 바뀌거나 대화가 끝날 때 이 배열에 든 것들을 전부 제거(destroy)한다.
             this.chatExtraObjects = [];
+
+            // =================================================================
+            // 🔄 대화창 "페이지 전환" 공용 함수
+            //  - imageKey: 새로 보여줄 대화창 이미지
+            //  - newExtras: 그 페이지에 올라갈 추가 요소들(텍스트 등). 없으면 빈 배열 []
+            //  - 기존에 떠있던 추가 요소(이전 페이지의 메뉴 텍스트 등)는 자동으로 정리(destroy)된다.
+            //  - GM처럼 "메뉴 선택 → 다른 이미지로 전환"하는 NPC는 메뉴 텍스트의 클릭 핸들러 안에서
+            //    이 함수를 호출하면 된다 (위 buildGMMenu 참고).
+            // =================================================================
+            this.setChatPage = (imageKey, newExtras = []) => {
+                // 이전 페이지에 있던 추가 요소들을 전부 제거
+                this.chatExtraObjects.forEach(obj => obj.destroy());
+
+                this.chatPopupImage.setTexture(imageKey).setPosition(640, 360).setVisible(true);
+
+                // 닫기 버튼을 "대화창 이미지의 가장 오른쪽 위"로 자동 배치 (이미지가 바뀌어도 항상 재계산)
+                const popupRightEdge = this.chatPopupImage.x + this.chatPopupImage.displayWidth / 2;
+                const popupTopEdge = this.chatPopupImage.y - this.chatPopupImage.displayHeight / 2;
+                this.chatExitButton.setPosition(popupRightEdge, popupTopEdge).setVisible(true);
+
+                this.chatExtraObjects = newExtras;
+            };
 
             // NPC와의 대화창을 연다 (entry: this.chatNpcs 배열의 항목 하나)
             this.openChat = (entry) => {
                 this.isChatOpen = true; // 대화 중에는 캐릭터 이동/점프를 막는다 (update()에서 이 플래그를 체크함)
 
-                this.chatPopupImage.setTexture(entry.chatImageKey).setPosition(640, 360).setVisible(true);
-
-                // 닫기 버튼을 "대화창 이미지의 가장 오른쪽 위"로 자동 배치
-                //  displayWidth/displayHeight = 화면에 실제로 보이는 크기 (이미지에 scale을 줬다면 그것까지 반영된 값)
-                const popupRightEdge = this.chatPopupImage.x + this.chatPopupImage.displayWidth / 2;
-                const popupTopEdge = this.chatPopupImage.y - this.chatPopupImage.displayHeight / 2;
-                this.chatExitButton.setPosition(popupRightEdge, popupTopEdge).setVisible(true);
-
-                // 이 NPC만의 추가 요소(계좌번호 텍스트, 지도 링크 등)가 있다면 생성해서 화면에 올린다
-                this.chatExtraObjects = entry.buildExtras ? entry.buildExtras() : [];
+                this.setChatPage(entry.chatImageKey, entry.buildExtras ? entry.buildExtras() : []);
 
                 this.player.setVelocityX(0); // 대화 시작 시 캐릭터를 제자리에 멈춰 세움
             };
@@ -685,7 +755,7 @@
                 this.chatPopupImage.setVisible(false);
                 this.chatExitButton.setVisible(false);
 
-                // 이번 대화에서 추가로 만들었던 요소(계좌번호 텍스트 등)들을 전부 제거
+                // 떠있던 추가 요소(계좌번호 텍스트, 메뉴 텍스트 등)들을 전부 제거
                 this.chatExtraObjects.forEach(obj => obj.destroy());
                 this.chatExtraObjects = [];
             };
@@ -711,16 +781,16 @@
             // 클릭으로도 대화 가능하게 설정 (대화 가능한 NPC를 늘릴 때마다 한 줄씩 추가)
             makeNpcClickable(npc_groom_fa);
             makeNpcClickable(npc_bride);
-            makeNpcClickable(npc_bride_fa);
             makeNpcClickable(npc_warena);
             makeNpcClickable(npc_spinel);
+            makeNpcClickable(npc_GM);
 
-            //this.coordText = this.add.text(0, 0, '(0, 0)', {
-            //    font: '30px Arial',
-            //    fill: '#ffff00', 
-            //    backgroundColor: 'rgba(0,0,0,0.7)', 
-            //    padding: { x: 5, y: 5 }
-            //}).setDepth(9999);
+            this.coordText = this.add.text(0, 0, '(0, 0)', {
+                font: '30px Arial',
+                fill: '#ffff00', 
+                backgroundColor: 'rgba(0,0,0,0.7)', 
+                padding: { x: 5, y: 5 }
+            }).setDepth(9999);
         }
 
         update() {
@@ -874,7 +944,3 @@
 </script>
 </body>
 </html>
-
-
-
-
