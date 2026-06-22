@@ -257,8 +257,9 @@
             // 💬 NPC 대화창 관련 이미지
             //  - 대화창은 NPC마다 다른 이미지를 쓰므로, NPC를 추가할 때마다 여기에 load 한 줄씩 추가하면 됩니다.
             //    예) this.load.image('chat_page_bride_fa', 'images/chat_page_bride_fa.png');
-            this.load.image('chat_page_groom_fa', 'images/chat_page_groom_fa.png'); // 신랑 아버지 NPC의 대화창 이미지
-            this.load.image('chat_page_bride', 'images/chat_page_bride.png'); // 신랑 아버지 NPC의 대화창 이미지
+            this.load.image('chat_page_groom_fa', 'images/chat_page_groom_fa.png'); // 신랑 아버지, 혼주 NPC의 대화창 이미지
+            this.load.image('chat_page_bride', 'images/chat_page_bride.png'); // 신부 NPC의 대화창 이미지
+            this.load.image('chat_page_bride_fa', 'images/chat_page_bride_fa.png'); // 신부 NPC의 대화창 이미지
             this.load.image('chat_page_warena', 'images/chat_page_warena.png'); // 워레나(축의금 계좌번호 안내) NPC의 대화창 이미지
             this.load.image('chat_page_spinel', 'images/chat_page_spinel.png'); // 스피넬(예식장 위치 안내) NPC의 대화창 이미지
             this.load.image('check_exit', 'images/check_exit.png'); // 대화창 닫기(X) 버튼 이미지 (모든 NPC 공용)
@@ -622,12 +623,13 @@
             this.chatNpcs = [
                 { npc: npc_groom_fa, chatImageKey: 'chat_page_groom_fa' },
                 { npc: npc_bride, chatImageKey: 'chat_page_bride' },
+                { npc: npc_bride_fa, chatImageKey: 'chat_page_bride_fa' },
                 { npc: npc_warena, chatImageKey: 'chat_page_warena', buildExtras: () => this.buildWarenaAccounts() },
                 { npc: npc_spinel, chatImageKey: 'chat_page_spinel', buildExtras: () => this.buildSpinelMapLink() },
             ];
 
             // NPC 상하좌우 기준 80 이내에 플레이어가 있는지 확인 (원형 거리가 아니라 x/y축 각각 비교)
-            const NPC_INTERACT_RANGE = 80;
+            const NPC_INTERACT_RANGE = 100;
             const isNearNpc = (npc) => {
                 return Math.abs(this.player.x - npc.x) <= NPC_INTERACT_RANGE &&
                        Math.abs(this.player.y - npc.y) <= NPC_INTERACT_RANGE;
@@ -709,6 +711,7 @@
             // 클릭으로도 대화 가능하게 설정 (대화 가능한 NPC를 늘릴 때마다 한 줄씩 추가)
             makeNpcClickable(npc_groom_fa);
             makeNpcClickable(npc_bride);
+            makeNpcClickable(npc_bride_fa);
             makeNpcClickable(npc_warena);
             makeNpcClickable(npc_spinel);
 
