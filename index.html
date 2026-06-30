@@ -121,12 +121,20 @@
                 : { x: 640, y: 360, scale: 2 }; // 💻 가로화면(컴퓨터 등): 기존 그대로 유지
 
             this.add.sprite(invitLayout.x, invitLayout.y, 'invit_0').setScale(invitLayout.scale).play('invit_playing').setInteractive().on('pointerup', () => {
-                enterLandscapeExperience(this.scale); // 전체화면 + 가로 고정 시도 + 이후 회전 안내 활성화
+                try { enterLandscapeExperience(this.scale); } catch (e) { console.warn('전체화면/가로고정 시도 실패:', e); } // 전체화면 + 가로 고정 시도 + 이후 회전 안내 활성화
+
+                let hasTransitioned = false;
+                const goToSelect = () => {
+                    if (hasTransitioned) return;
+                    hasTransitioned = true;
+                    this.scene.start('SelectScene');
+                };
 
                 this.cameras.main.fadeOut(1000, 0, 0, 0);
-                this.cameras.main.once('camerafadeoutcomplete', () => {
-                    this.scene.start('SelectScene');
-                });
+                this.cameras.main.once('camerafadeoutcomplete', goToSelect);
+
+                // 🛡️ 안전장치: 페이드 완료 이벤트가 어떤 이유로든 발생하지 않아도 1.8초 후 강제 진행
+                this.time.delayedCall(1800, goToSelect);
             });
         }
     }
@@ -152,6 +160,13 @@
             this.add.image(660, 170, 'title').setScale(0.45);
 
             let soundBtn = this.add.image(1200, 50, 'sound_off').setInteractive({ useHandCursor: true }).setScale(0.1);
+
+            // 🖥️ 수동 전체화면 전환 버튼 (사운드 버튼 옆)
+            //  - iOS Safari 등 자동 전체화면이 안 되는 기기에서 사용자가 직접 누를 수 있도록 제공합니다.
+            //  - 색: 검정(#000000), 크기: 43px (36px × 1.2배)
+            this.add.text(1100, 30, '⛶', { font: '43px Arial', fill: '#000000' })
+                .setInteractive({ useHandCursor: true })
+                .on('pointerdown', () => enterLandscapeExperience(this.scale));
             let bgm = null;
             if (this.cache.audio.exists('bgm_select')) {
                 bgm = this.sound.add('bgm_select', { loop: true, volume: 0.5 });
@@ -193,26 +208,50 @@
             tobenBtn.on('pointerdown', () => selectCharacter(tobenBtn, 'toben'));
             
             this.add.image(1150, 305, 'sign').setScale(0.3).setInteractive().on('pointerdown', () => { 
-                if(this.selectedChar) {
-                    this.sound.play('bgm_portal');
+                if (!this.selectedChar) return;
 
-                    this.cameras.main.fadeOut(1000, 0, 0, 0);
-                    this.cameras.main.once('camerafadeoutcomplete', () => {
+                // 🛡️ 사운드 재생 자체가 실패해도(일부 iOS Safari 환경) 다음 동작이 막히지 않도록 보호
+                try { this.sound.play('bgm_portal'); } catch (e) { console.warn('포탈 효과음 재생 실패:', e); }
+
+                // 한 번만 전환되도록 막는 플래그 (페이드 이벤트 + 안전장치 타이머가 동시에 실행되는 것 방지)
+                let hasTransitioned = false;
+
+                const goToVillage = () => {
+                    if (hasTransitioned) return;
+                    hasTransitioned = true;
+                    this.scene.start('VillageScene', { character: this.selectedChar, isSoundOn: this.isSoundOn });
+                };
+
+                const startTransition = () => {
+                    if (hasTransitioned) return;
+                    // 🛡️ 배경음(bgm) 페이드아웃 도중 어떤 이유로든(특히 iOS Safari의 Web Audio 특성) 오류가 나도
+                    //    다음 화면으로의 전환만큼은 절대 막히지 않도록 try/catch로 감싼다.
+                    try {
                         if (bgm && bgm.isPlaying) {
                             this.tweens.add({
                                 targets: bgm,
                                 volume: 0,
                                 duration: 500,
                                 onComplete: () => {
-                                    bgm.stop();
-                                    this.scene.start('VillageScene', { character: this.selectedChar, isSoundOn: this.isSoundOn }); 
+                                    try { bgm.stop(); } catch (e) {}
+                                    goToVillage();
                                 }
                             });
                         } else {
-                            this.scene.start('VillageScene', { character: this.selectedChar, isSoundOn: this.isSoundOn }); 
+                            goToVillage();
                         }
-                    });
-                }
+                    } catch (e) {
+                        console.warn('배경음 정지 중 오류 발생 - 그래도 다음 화면으로 진행합니다:', e);
+                        goToVillage();
+                    }
+                };
+
+                this.cameras.main.fadeOut(1000, 0, 0, 0);
+                this.cameras.main.once('camerafadeoutcomplete', startTransition);
+
+                // 🛡️ 최종 안전장치: 페이드 완료 이벤트가 어떤 기기/브라우저에서 발생하지 않더라도,
+                //    1.8초 후엔 강제로 다음 화면으로 진행시킨다 (까만 화면에 영원히 멈추는 것 방지)
+                this.time.delayedCall(1800, startTransition);
             });
         }
     }
@@ -255,21 +294,24 @@
             this.load.image('text_GM_2', 'images/text_GM_2.png');
 
             // 💬 NPC 대화창 관련 이미지
-            //  - 대화창은 NPC마다 다른 이미지를 쓰므로, NPC를 추가할 때마다 여기에 load 한 줄씩 추가하면 됩니다.
-            //    예) this.load.image('chat_page_bride_fa', 'images/chat_page_bride_fa.png');
-            this.load.image('chat_page_groom_fa', 'images/chat_page_groom_fa.png'); // 신랑 아버지 NPC의 대화창 이미지
-            this.load.image('chat_page_bride', 'images/chat_page_bride.png'); // 신부 NPC의 대화창 이미지
-            this.load.image('chat_page_warena', 'images/chat_page_warena.png'); // 워레나(축의금 계좌번호 안내) NPC의 대화창 이미지
-            this.load.image('chat_page_spinel', 'images/chat_page_spinel.png'); // 스피넬(예식장 위치 안내) NPC의 대화창 이미지
-            this.load.image('check_exit', 'images/check_exit.png'); // 대화창 닫기(X) 버튼 이미지 (모든 NPC 공용)
+            //  ✅ 새 NPC 추가 시: 여기에 load 한 줄 + chatNpcs 배열에 한 줄 + makeNpcClickable 한 줄
+            this.load.image('chat_page_groom_fa', 'images/chat_page_groom_fa.png'); // 신랑 혼주(아버지+어머니) 공용 대화창
+            this.load.image('chat_page_bride_fa', 'images/chat_page_bride_fa.png'); // 신부 혼주(아버지+어머니) 공용 대화창
+            this.load.image('chat_page_groom',    'images/chat_page_groom.png');    // 신랑 NPC 대화창
+            this.load.image('chat_page_bride',    'images/chat_page_bride.png');    // 신부 NPC 대화창
+            this.load.image('chat_page_warena',   'images/chat_page_warena.png');   // 워레나(계좌번호) NPC 대화창
+            this.load.image('chat_page_spinel',   'images/chat_page_spinel.png');   // 스피넬(예식장 위치) NPC 대화창
+            this.load.image('chat_page_camera',   'images/chat_page_camera.png');   // 카메라(사진 링크) NPC 대화창
+            this.load.image('chat_page_letter',   'images/chat_page_letter.png');   // 우체통(편지 링크) NPC 대화창
+            this.load.image('check_exit', 'images/check_exit.png'); // 대화창 닫기(X) 버튼 (모든 NPC 공용)
 
-            // 👑 운영자(GM) NPC 대화창 이미지 - 메인 메뉴 1장 + 메뉴 선택 시 보여줄 하위 페이지 5장
-            this.load.image('chat_page_GM', 'images/chat_page_GM.png');     // GM 대화 시작 시 보이는 메인 메뉴 이미지
-            this.load.image('chat_page_GM_1', 'images/chat_page_GM_1.png'); // 1. 신랑, 신부, 혼주
-            this.load.image('chat_page_GM_2', 'images/chat_page_GM_2.png'); // 2. 축의 정보
-            this.load.image('chat_page_GM_3', 'images/chat_page_GM_3.png'); // 3. 결혼식장 위치
-            this.load.image('chat_page_GM_4', 'images/chat_page_GM_4.png'); // 4. 웨딩 촬영 사진
-            this.load.image('chat_page_GM_5', 'images/chat_page_GM_5.png'); // 5. 우체통
+            // 👑 운영자(GM) NPC 대화창 이미지 - 메인 메뉴 1장 + 하위 페이지 5장
+            this.load.image('chat_page_GM',   'images/chat_page_GM.png');
+            this.load.image('chat_page_GM_1', 'images/chat_page_GM_1.png');
+            this.load.image('chat_page_GM_2', 'images/chat_page_GM_2.png');
+            this.load.image('chat_page_GM_3', 'images/chat_page_GM_3.png');
+            this.load.image('chat_page_GM_4', 'images/chat_page_GM_4.png');
+            this.load.image('chat_page_GM_5', 'images/chat_page_GM_5.png');
         }
 
         create() {
@@ -594,6 +636,22 @@
             };
 
             // =================================================================
+            // 🔗 링크형 NPC 공용 헬퍼
+            //  - 스피넬, 카메라, 우체통처럼 "클릭하면 새 탭에서 링크가 열리는" NPC들이
+            //    모두 이 함수 하나를 재사용합니다. buildExtras에서 호출하기만 하면 됩니다.
+            // =================================================================
+            this.buildLinkExtra = (x, y, url) => {
+                const text = this.add.text(x, y, url, {
+                    font: '30px Arial',
+                    fill: '#0033cc',
+                    backgroundColor: 'rgba(255,255,255,0.6)',
+                    padding: { x: 6, y: 3 },
+                }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(20002).setInteractive({ useHandCursor: true });
+                text.on('pointerdown', () => window.open(url, '_blank'));
+                return [text];
+            };
+
+            // =================================================================
             // 📍 스피넬(예식장 위치 안내) 설정
             //  - WEDDING_HALL_MAP_URL: 클릭 시 열릴 지도 링크. 네이버지도/카카오맵 등 실제 링크로 바꾸세요.
             //  - SPINEL_TEXT_LAYOUT: 링크 텍스트가 표시될 좌표(x, y). 자유롭게 옮기세요.
@@ -602,28 +660,24 @@
             const SPINEL_TEXT_LAYOUT = { x: 850, y: 400 };
 
             // 대화창을 열 때 호출되어, 클릭 가능한 지도 링크 텍스트를 만들어 반환한다.
-            this.buildSpinelMapLink = () => {
-                const text = this.add.text(SPINEL_TEXT_LAYOUT.x, SPINEL_TEXT_LAYOUT.y, WEDDING_HALL_MAP_URL, {
-                    font: '30px Arial',
-                    fill: '#0033cc',
-                    backgroundColor: 'rgba(255,255,255,0.6)',
-                    padding: { x: 6, y: 3 },
-                })
-                    .setOrigin(0.5, 0.5)
-                    .setScrollFactor(0)
-                    .setDepth(20002)
-                    .setInteractive({ useHandCursor: true });
-
-                // 클릭하면 새 탭으로 지도 링크를 연다
-                text.on('pointerdown', () => {
-                    window.open(WEDDING_HALL_MAP_URL, '_blank');
-                });
-
-                return [text];
-            };
+            this.buildSpinelMapLink = () => this.buildLinkExtra(SPINEL_TEXT_LAYOUT.x, SPINEL_TEXT_LAYOUT.y, WEDDING_HALL_MAP_URL);
 
             // =================================================================
-            // 👑 운영자(GM) 메뉴 설정
+            // 📷 카메라(웨딩 사진) NPC / 📬 우체통(편지) NPC 설정
+            //  - 각각 링크를 열어주는 단순 버튼형 NPC입니다 (스피넬과 동일한 방식).
+            //  - 링크 주소나 텍스트 위치(x, y)를 바꾸고 싶으면 아래 상수만 수정하세요.
+            // =================================================================
+            const CAMERA_LINK_URL = 'https://www.naver.com/';          // ⚠️ 실제 웨딩 사진 링크로 교체하세요
+            const CAMERA_TEXT_LAYOUT = { x: 880, y: 372 };
+            const LETTER_LINK_URL = 'https://buly.kr/CWwRsFn';          // 우체통(편지/방명록) 링크
+            const LETTER_TEXT_LAYOUT = { x: 915, y: 372 };
+
+            this.buildCameraLink = () => this.buildLinkExtra(CAMERA_TEXT_LAYOUT.x, CAMERA_TEXT_LAYOUT.y, CAMERA_LINK_URL);
+            this.buildLetterLink = () => this.buildLinkExtra(LETTER_TEXT_LAYOUT.x, LETTER_TEXT_LAYOUT.y, LETTER_LINK_URL);
+
+            // =================================================================
+            // 👑 운영자(GM) 메뉴 설정 (기존과 동일)
+            // =================================================================
             //  - GM_MENU_ITEMS: 메뉴에 보일 텍스트와, 클릭했을 때 전환할 대화창 이미지 키.
             //    순서를 바꾸거나 문구를 바꾸고 싶으면 label만 수정하면 됩니다.
             //  - GM_MENU_TEXT_LAYOUT: 각 줄의 좌표(x, y). GM_MENU_ITEMS와 1:1로 대응됩니다.
@@ -641,11 +695,11 @@
             // GM_MENU_ITEMS와 순서가 1:1로 맞아야 합니다 (1번째 좌표 = 1번째 메뉴, ...)
             // 모든 줄의 x값을 같게 두면 왼쪽 줄이 자동으로 맞춰집니다 (왼쪽 정렬).
             const GM_MENU_TEXT_LAYOUT = [
-                { x: 560, y: 300 },
-                { x: 560, y: 335 },
-                { x: 560, y: 370 },
-                { x: 560, y: 405 },
-                { x: 560, y: 440 },
+                { x: 430, y: 310 },
+                { x: 430, y: 350 },
+                { x: 430, y: 390 },
+                { x: 430, y: 430 },
+                { x: 430, y: 470 },
             ];
 
             // GM의 메인 메뉴(대화창을 열었을 때 보이는 선택 텍스트들)를 만들어 반환한다.
@@ -673,16 +727,30 @@
                 });
             };
 
-            // 대화 가능한 NPC 목록
-            //  - chatImageKey: 대화창 이미지
-            //  - buildExtras(선택): 이미지 위에 추가로 올릴 클릭 가능한 텍스트 등을 만드는 함수.
-            //    단순 이미지 1장짜리 대화창이라면 buildExtras 없이 등록하면 됩니다.
+            // =================================================================
+            // 💬 대화 가능한 NPC 목록 (총 9명)
+            //  ✅ 새 NPC 추가 시: 이 목록에 한 줄 + makeNpcClickable 한 줄만 추가하면 됩니다.
+            //
+            //  형식:
+            //   { npc: NPC객체, chatImageKey: '대화창이미지키' }              ← 이미지 1장짜리 단순 대화창
+            //   { npc: NPC객체, chatImageKey: '대화창이미지키',
+            //     buildExtras: () => this.빌더함수() }                        ← 추가 요소(텍스트/링크 등)가 있는 대화창
+            // =================================================================
             this.chatNpcs = [
-                { npc: npc_groom_fa, chatImageKey: 'chat_page_groom_fa' },
-                { npc: npc_bride, chatImageKey: 'chat_page_bride' },
+                // 혼주석 NPC (신랑 혼주 2명은 같은 이미지 공유, 신부 혼주 2명도 같은 이미지 공유)
+                { npc: npc_groom_fa, chatImageKey: 'chat_page_groom_fa' }, // 신랑 아버지
+                { npc: npc_groom_mo, chatImageKey: 'chat_page_groom_fa' }, // 신랑 어머니 (같은 이미지 공유)
+                { npc: npc_bride_fa, chatImageKey: 'chat_page_bride_fa' }, // 신부 아버지
+                { npc: npc_bride_mo, chatImageKey: 'chat_page_bride_fa' }, // 신부 어머니 (같은 이미지 공유)
+                // 신랑 신부 NPC
+                { npc: npc_groom, chatImageKey: 'chat_page_groom' }, // 신랑
+                { npc: npc_bride, chatImageKey: 'chat_page_bride' }, // 신부
+                // 기능형 NPC (텍스트/링크 추가 요소 포함)
                 { npc: npc_warena, chatImageKey: 'chat_page_warena', buildExtras: () => this.buildWarenaAccounts() },
                 { npc: npc_spinel, chatImageKey: 'chat_page_spinel', buildExtras: () => this.buildSpinelMapLink() },
-                { npc: npc_GM, chatImageKey: 'chat_page_GM', buildExtras: () => this.buildGMMenu() },
+                { npc: npc_camera, chatImageKey: 'chat_page_camera', buildExtras: () => this.buildCameraLink() },
+                { npc: npc_letter, chatImageKey: 'chat_page_letter', buildExtras: () => this.buildLetterLink() },
+                { npc: npc_GM,     chatImageKey: 'chat_page_GM',     buildExtras: () => this.buildGMMenu() },
             ];
 
             // NPC 상하좌우 기준 80 이내에 플레이어가 있는지 확인 (원형 거리가 아니라 x/y축 각각 비교)
@@ -694,38 +762,27 @@
 
             // 대화창(팝업) 이미지 + 닫기(X) 버튼은 미리 1세트만 만들어두고, 대화할 때마다
             // 텍스처(이미지)만 바꿔 끼워서 재사용한다 (NPC마다 새로 만들지 않음)
-            const CHAT_POPUP_SCALE = 0.4; // 모든 NPC 대화창에 공통으로 적용될 크기 배수 - 여기 숫자만 바꾸면 전체 반영됨
+            const CHAT_POPUP_SCALE = 0.4; // 모든 NPC 대화창 크기 배수 - 여기 숫자만 바꾸면 전체 반영됨
             
             this.chatPopupImage = this.add.image(640, 360, 'chat_page_groom_fa')
-                .setScale(CHAT_POPUP_SCALE)
-                .setOrigin(0.5, 0.5)    // 중심 기준으로 정렬해야 "화면 정중앙"에 놓기 편함
-                .setScrollFactor(0)      // 카메라(맵)가 움직여도 화면에 고정되도록
-                .setDepth(20000)     // 다른 모든 요소(UI 포함)보다 위에 보이도록 최상단 depth
-                .setVisible(false);
+                .setScale(CHAT_POPUP_SCALE).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(20000).setVisible(false);
 
             this.chatExitButton = this.add.image(0, 0, 'check_exit')
-                .setOrigin(0.7, 0)         // 오른쪽-위 모서리를 기준점으로 → "대화창의 가장 오른쪽 위"에 놓기 쉬워짐
-                .setScrollFactor(0)
-                .setDepth(20001)         // 대화창 이미지보다 한 단계 더 위 (가려지지 않도록)
-                .setInteractive({ useHandCursor: true })
-                .setScale(1.5)      // 크기 조절
-                .setVisible(false);
-
-            // 닫기(X) 버튼을 누르면 대화창 닫기 (메뉴든 하위 페이지든 어디서 누르든 전체 대화가 종료됨)
+                .setOrigin(0.7, 0).setScrollFactor(0).setDepth(20001)
+                .setInteractive({ useHandCursor: true }).setScale(1.5).setVisible(false);
             this.chatExitButton.on('pointerdown', () => this.closeChat());
 
-            // 현재 열려있는 대화의 "추가 요소"들(계좌번호 텍스트, 메뉴 텍스트, 지도 링크 등)을 보관해두는 배열
-            // → 페이지가 바뀌거나 대화가 끝날 때 이 배열에 든 것들을 전부 제거(destroy)한다.
+            // 현재 열려있는 대화의 추가 요소들(텍스트, 링크 등)을 보관 → 닫힐 때 전부 destroy
             this.chatExtraObjects = [];
 
             // =================================================================
             // 🔄 대화창 "페이지 전환" 공용 함수
             //  - imageKey: 새로 보여줄 대화창 이미지
-            //  - newExtras: 그 페이지에 올라갈 추가 요소들(텍스트 등). 없으면 빈 배열 []
-            //  - 기존에 떠있던 추가 요소(이전 페이지의 메뉴 텍스트 등)는 자동으로 정리(destroy)된다.
+            //  - newExtras: 그 페이지에 올라갈 추가 요소들. 없으면 빈 배열 []
             //  - GM처럼 "메뉴 선택 → 다른 이미지로 전환"하는 NPC는 메뉴 텍스트의 클릭 핸들러 안에서
-            //    이 함수를 호출하면 된다 (위 buildGMMenu 참고).
+            //    이 함수를 호출하면 됩니다 (buildGMMenu 참고).
             // =================================================================
+
             this.setChatPage = (imageKey, newExtras = []) => {
                 // 이전 페이지에 있던 추가 요소들을 전부 제거
                 this.chatExtraObjects.forEach(obj => obj.destroy());
@@ -778,12 +835,18 @@
                 });
             };
 
-            // 클릭으로도 대화 가능하게 설정 (대화 가능한 NPC를 늘릴 때마다 한 줄씩 추가)
-            makeNpcClickable(npc_groom_fa);
-            makeNpcClickable(npc_bride);
-            makeNpcClickable(npc_warena);
-            makeNpcClickable(npc_spinel);
-            makeNpcClickable(npc_GM);
+            // ✅ 클릭(터치)으로 대화 가능하게 설정 (새 NPC 추가 시 여기에 한 줄씩 추가)
+            [npc_groom_fa, npc_groom_mo, npc_bride_fa, npc_bride_mo,
+             npc_groom, npc_bride,
+             npc_warena, npc_spinel, npc_camera, npc_letter, npc_GM
+            ].forEach(makeNpcClickable);
+
+            // 🖥️ 웨딩빌리지 인게임 내 전체화면 버튼 (사운드 버튼 옆)
+            //  - SelectScene과 동일: 검정 아이콘, 43px
+            this.add.text(1100, 30, '⛶', { font: '43px Arial', fill: '#000000' })
+                .setInteractive({ useHandCursor: true })
+                .setScrollFactor(0).setDepth(9999)
+                .on('pointerdown', () => enterLandscapeExperience(this.scale));
 
             this.coordText = this.add.text(0, 0, '(0, 0)', {
                 font: '30px Arial',
